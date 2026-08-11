@@ -17,11 +17,13 @@ Tasks:
 - [ ] Create Next.js application
 - [ ] Create database
 - [ ] Create Transaction model
-- [ ] Create authenticated transaction endpoint
+- [ ] Create authenticated transaction endpoint (with minimal idempotency + validation)
 - [ ] Create Notion integration
 - [ ] Create iOS Shortcut instructions
 - [ ] Process a real transaction
 - [ ] Create the transaction in Notion
+
+> **Decision:** minimal idempotency and input validation are pulled into V0 (they are security invariants). Full retry and error-recovery machinery stays in V1.
 
 ---
 
@@ -29,8 +31,8 @@ Tasks:
 
 **Goal:** make transaction processing reliable.
 
-- [ ] Idempotency
-- [ ] Validation
+- [ ] Hardened idempotency (beyond V0 minimal)
+- [ ] Comprehensive validation (beyond V0 minimal)
 - [ ] Error handling
 - [ ] Retry mechanism
 - [ ] Transaction history

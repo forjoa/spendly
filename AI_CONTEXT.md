@@ -18,8 +18,9 @@ Notion is an integration, not the product.
 
 - Next.js
 - TypeScript
-- PostgreSQL
+- PostgreSQL (Neon)
 - Drizzle ORM
+- Better Auth (email/password)
 - Vercel
 - Tailwind CSS
 - shadcn/ui
@@ -53,6 +54,18 @@ V0:
 `Apple Wallet → Shortcut → Spendly API → Notion`
 
 The immediate goal is to prove that a real Wallet transaction can enter Spendly and become a Notion transaction automatically.
+
+### V0 confirmed decisions
+
+- Database: Neon PostgreSQL + Drizzle ORM.
+- Auth: Better Auth with email/password only.
+- Notion: manually provided internal integration token. No OAuth in V0.
+- Money: store as integer minor units (e.g. EUR cents); keep `currency` separate. Never use floating-point for amounts.
+- Idempotency: minimal idempotency and input validation are in scope for V0. Full retry/error-recovery machinery remains V1.
+- Schema: minimal — `User`, `Transaction`, `ApiKey`, and a minimal `Connection`. No generic `Destination` model in V0.
+- Ingestion API: `POST /api/transactions`.
+- API keys: generated securely, only a secure hash is stored, raw key shown once, never logged.
+- Notion credentials: application-level encryption using a server-side key from environment variables. Token is never returned to the client after being saved.
 
 ## Current state
 

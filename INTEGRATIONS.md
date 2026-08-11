@@ -41,6 +41,12 @@ Initial destinations:
 - Webhook
 - Custom API
 
+### Notion (V0)
+
+- Authenticated with a manually provided **internal integration token**.
+- OAuth is **not** implemented in V0.
+- The token is stored encrypted (see SECURITY.md) and never exposed to the client after saving.
+
 Future destinations may include:
 
 - Google Sheets
@@ -75,7 +81,7 @@ Example:
 ```json
 {
   "merchant": "Mercadona",
-  "amount": 23.47,
+  "amountMinor": 2347,
   "currency": "EUR",
   "date": "2026-08-11T10:32:00Z",
   "type": "expense",
@@ -83,6 +89,8 @@ Example:
   "source": "apple_wallet"
 }
 ```
+
+`amountMinor` is an integer in the currency's minor units (e.g. cents). Amounts are never floating-point.
 
 Adapters transform this model into the format required by the destination.
 

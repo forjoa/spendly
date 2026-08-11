@@ -18,6 +18,19 @@ Security is a core product requirement.
 - API keys must be hashed or securely stored.
 - API keys must only provide the minimum required access.
 
+### API keys (V0)
+
+- Generate keys with a cryptographically secure random source.
+- Store only a secure hash of the key; never persist the raw key.
+- Show the raw key to the user exactly once, at creation time.
+- Never log the raw key or its hash.
+
+### Integration credentials (V0)
+
+- The Notion internal integration token is persisted using application-level encryption.
+- The encryption key is a server-side secret stored in an environment variable.
+- The token is never returned to the client after it has been saved.
+
 ## API
 
 Every external input must be:
