@@ -66,6 +66,10 @@ The immediate goal is to prove that a real Wallet transaction can enter Spendly 
 - Ingestion API: `POST /api/transactions`.
 - API keys: generated securely, only a secure hash is stored, raw key shown once, never logged.
 - Notion credentials: application-level encryption using a server-side key from environment variables. Token is never returned to the client after being saved.
+- Encryption: AES-256-GCM with a unique nonce/IV per encrypted value. Key from `SPENDLY_ENCRYPTION_KEY` (required). Encryption code is server-only and isolated from the UI.
+- Delivery flow: authenticate → validate → persist transaction → deliver to Notion synchronously → respond. No queues, Redis, workers, or cron in V0. Persistence and delivery are separate responsibilities internally.
+- Delivery failures: the transaction stays persisted (never rolled back or deleted); the endpoint returns an integration error (`502`) without exposing Notion credentials or internal errors. Code is structured so async delivery can be added later without rewriting the transaction domain.
+- Delivery tracking: a minimal, integration-agnostic `TransactionDelivery` table records per-provider delivery state and the external delivery id. This guarantees the same external transaction never produces multiple Notion pages. No generic destination platform is introduced.
 
 ## Current state
 

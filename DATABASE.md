@@ -76,11 +76,31 @@ Represents credentials used by external clients such as the iOS Shortcut.
 
 Never store raw API keys.
 
+### TransactionDelivery
+
+Records the delivery state of a transaction to a single external provider.
+
+Minimal and integration-agnostic (no Notion-specific fields):
+
+```text
+id
+transactionId
+provider          -- e.g. "notion"
+status            -- pending | delivered | failed
+externalDeliveryId -- id returned by the provider (e.g. Notion page id)
+error             -- last error summary, nullable, never contains credentials
+createdAt
+updatedAt
+```
+
+Purpose: guarantee that the same external transaction never produces multiple Notion pages. A `delivered` row short-circuits re-delivery on an idempotent replay. This table lets us add more destinations later without changing the `Transaction` model.
+
 ## Relationships
 
 ```text
 User
  ├── Transactions
+ │    └── TransactionDeliveries
  ├── Connections
  ├── Destinations
  └── ApiKeys
@@ -98,3 +118,4 @@ User
 - Each transaction carries a client-supplied `externalId`.
 - A unique constraint on `(userId, externalId)` guarantees a given source transaction is stored at most once per user.
 - Re-sending the same `(userId, externalId)` returns the existing transaction rather than creating a duplicate.
+- Delivery idempotency is tracked separately in `TransactionDelivery` via a unique `(transactionId, provider)` constraint, so a replay never creates a second Notion page.

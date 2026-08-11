@@ -28,7 +28,9 @@ Security is a core product requirement.
 ### Integration credentials (V0)
 
 - The Notion internal integration token is persisted using application-level encryption.
-- The encryption key is a server-side secret stored in an environment variable.
+- Algorithm: **AES-256-GCM** with a unique nonce/IV per encrypted value; the GCM auth tag is stored alongside the ciphertext.
+- The encryption key is a server-side secret in `SPENDLY_ENCRYPTION_KEY` (required).
+- The encryption implementation is **server-only** and isolated from the UI; it is never imported into client components.
 - The token is never returned to the client after it has been saved.
 
 ## API
