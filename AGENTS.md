@@ -110,14 +110,17 @@ Progress against ROADMAP.md phases:
 - Connection domain: `src/domain/connection/` — `repository.ts` (namespace `connectionRepo`), `credentials.ts` (encrypt/decrypt JSON credential payloads).
 - Notion adapter: `src/infrastructure/integrations/notion/adapter.ts` — creates a page in a Notion database per transaction; sanitizes errors; never exposes the token.
 - Public API: `POST /api/transactions` (single or array up to 50) and `GET /api/transactions` in `src/app/api/transactions/route.ts`. API error helper in `src/app/api/_lib/errors.ts` maps `SpendlyError` subclasses to HTTP status without leaking internals.
+- App UI (route groups): `(auth)` group for sign-in/sign-up (no shell, redirects if signed in); `(app)` group for the protected app (server layout checks session via `getSession()`, redirects to `/sign-in` otherwise, renders `AppShell`). Both layouts are `force-dynamic` because they depend on the session cookie.
+- API-key management UI (`/api-keys`): server page lists keys (label, suffix, created, last-used, status) via `src/domain/api-key/service.ts`; client dialog (`create-key-dialog.tsx`) calls the `createApiKeyAction` server action and shows the raw key once with copy + warning; `revoke-key-button.tsx` calls `revokeApiKeyAction`.
+- Connections UI (`/connections`): server page lists connections with provider label and enabled badge; client dialog (`create-connection-dialog.tsx`) collects Notion token + database id and calls `createNotionConnectionAction` (encrypts at rest); `delete-connection-button.tsx` calls `deleteConnectionAction`.
+- Transactions list (`/transactions`): server page shows recent transactions with merchant, amount (integer minor units via `Amount`), date, source, and per-destination delivery status badges (`StatusBadge`). Uses `listTransactionsWithDeliveries` in the transaction service.
+- Overview (`/overview`): dashboard cards (recent expense total, connection count, active API-key count) plus a recent-spending table and a get-started empty state when nothing is configured.
+- Settings (`/settings`): account details (name, email, verified) and a client `SignOutButton` that calls `authClient.signOut`.
 
 Not yet implemented (intentional, per V0 scope):
 
-- Sign-up/sign-in UI pages and the auth-aware app shell (route protection, redirects). API and client exist; pages do not.
-- API-key management UI and `POST /api/api-keys` endpoint to create/rotate/revoke keys.
-- Connections UI and endpoints to create/list/delete Notion connections.
-- Dashboard (`/overview`), transactions list (`/transactions`), settings pages are still placeholder pages from the UI-shell phase.
 - Drizzle migration has not been applied to a live database yet (no Neon instance configured in this environment).
 - E2E test of the full Apple Wallet → Spendly → Notion loop against real services.
+- Apple Wallet shortcut setup instructions / onboarding copy.
 
-Checks (all green as of this writing): `npm run typecheck`, `npm run build` (9 routes, 2 dynamic API routes), `npm run lint` (0 warnings), `npm test` (37 passed: money 19, crypto 7, keys 11).
+Checks (all green as of this writing): `npm run typecheck`, `npm run build` (11 routes, 2 dynamic API routes), `npm run lint` (0 warnings), `npm test` (37 passed: money 19, crypto 7, keys 11).

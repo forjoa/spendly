@@ -1,7 +1,7 @@
 import "server-only"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 import { db, schema } from "@/infrastructure/db/client"
-import type { Transaction } from "@/infrastructure/db/schema"
+import type { Transaction, TransactionDelivery as TransactionDeliveryRow } from "@/infrastructure/db/schema"
 import { ValidationError, DestinationError } from "@/lib/errors"
 import * as txRepo from "./repository"
 import * as deliveryRepo from "./delivery-repository"
@@ -154,6 +154,29 @@ export async function listTransactions(
     throw new ValidationError("limit must be between 1 and 100")
   }
   return txRepo.listByUser(userId, limit)
+}
+
+export async function listTransactionsWithDeliveries(
+  userId: string,
+  limit = 50,
+): Promise<{ transaction: Transaction; deliveries: TransactionDeliveryRow[] }[]> {
+  const transactions = await listTransactions(userId, limit)
+  if (transactions.length === 0) return []
+  const ids = transactions.map((t) => t.id)
+  const deliveries = await db
+    .select()
+    .from(schema.transactionDeliveries)
+    .where(inArray(schema.transactionDeliveries.transactionId, ids))
+  const byTx = new Map<string, TransactionDeliveryRow[]>()
+  for (const d of deliveries) {
+    const list = byTx.get(d.transactionId) ?? []
+    list.push(d)
+    byTx.set(d.transactionId, list)
+  }
+  return transactions.map((transaction) => ({
+    transaction,
+    deliveries: byTx.get(transaction.id) ?? [],
+  }))
 }
 
 export async function getTransaction(
