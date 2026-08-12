@@ -11,17 +11,17 @@ import * as schema from "../db/schema"
   adapter. The `user` and `session` tables in schema.ts mirror Better Auth's
   expected schema so our foreign keys stay valid.
 
+  Standard Better Auth environment variables are used:
+    BETTER_AUTH_SECRET  — signs session tokens (required in production)
+    BETTER_AUTH_URL     — public base URL for callbacks and absolute links
+  Both are read automatically by Better Auth when not set in options, so
+  we omit them here and let the library resolve them from the environment.
+
   The instance is created lazily on first use so importing this module
   (e.g. during `next build`) does not require live secrets.
 */
 
 function buildOptions(): BetterAuthOptions {
-  const secret = process.env.BETTER_AUTH_SECRET
-  if (!secret) {
-    throw new Error(
-      "BETTER_AUTH_SECRET is not set. Generate one with: openssl rand -base64 32",
-    )
-  }
   return {
     database: drizzleAdapter(getDB(), {
       provider: "pg",
@@ -30,8 +30,7 @@ function buildOptions(): BetterAuthOptions {
         session: schema.session,
       },
     }),
-    secret,
-    baseURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    baseURL: process.env.BETTER_AUTH_URL,
     emailAndPassword: {
       enabled: true,
       autoSignIn: false,
