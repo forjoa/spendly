@@ -123,4 +123,4 @@ Not yet implemented (intentional, per V0 scope):
 - E2E test of the full Apple Wallet → Spendly → Notion loop against real services.
 - Apple Wallet shortcut setup instructions / onboarding copy.
 
-Checks (all green as of this writing): `npm run typecheck`, `npm run build` (11 routes, 2 dynamic API routes), `npm run lint` (0 warnings), `npm test` (37 passed: money 19, crypto 7, keys 11).
+Checks (all green as of this writing): `npm run typecheck`, `npm run build` (11 routes, 2 dynamic API routes), `npm run lint` (0 warnings), `npm test` (63 passed: money 19, crypto 7, keys 11, transaction schema 19, error mapper 7).
