@@ -19,7 +19,7 @@ Tasks:
 - [x] Create Transaction model
 - [x] Create authenticated transaction endpoint (with minimal idempotency + validation)
 - [x] Create Notion integration
-- [ ] Create iOS Shortcut instructions
+- [x] Create iOS Shortcut instructions
 - [ ] Process a real transaction
 - [ ] Create the transaction in Notion
 

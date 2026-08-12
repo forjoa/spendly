@@ -1,6 +1,7 @@
 "use client"
 import * as React from "react"
 import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { deleteConnectionAction } from "./actions"
@@ -25,8 +26,9 @@ export function DeleteConnectionButton({
         startTransition(async () => {
           try {
             await deleteConnectionAction(fd)
+            toast.success("Connection removed")
           } catch (err) {
-            console.error(err)
+            toast.error(err instanceof Error ? err.message : "Could not remove connection")
           }
         })
       }}

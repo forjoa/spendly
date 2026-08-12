@@ -32,7 +32,11 @@ export default async function ApiKeysPage() {
         </div>
         <p className="text-sm text-muted-foreground">
           Generate keys that your Apple Wallet shortcut uses to post transactions
-          to Spendly. The raw value is shown only once at creation.
+          to Spendly. The raw value is shown only once at creation. See the{" "}
+          <a href="/docs/apple-wallet-shortcut" className="underline underline-offset-2 hover:text-foreground">
+            Apple Wallet Shortcut setup guide
+          </a>
+          .
         </p>
       </div>
 

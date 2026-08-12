@@ -121,6 +121,6 @@ Not yet implemented (intentional, per V0 scope):
 
 - Drizzle migration has not been applied to a live database yet (no Neon instance configured in this environment).
 - E2E test of the full Apple Wallet → Spendly → Notion loop against real services.
-- Apple Wallet shortcut setup instructions / onboarding copy.
+- Apple Wallet shortcut setup instructions are at `docs/apple-wallet-shortcut.md` and rendered at `/docs/apple-wallet-shortcut`. Test procedures are at `scripts/v0-test.sh` and `scripts/v0-failure-test.sh` (not yet executed against live infrastructure).
 
-Checks (all green as of this writing): `npm run typecheck`, `npm run build` (11 routes, 2 dynamic API routes), `npm run lint` (0 warnings), `npm test` (63 passed: money 19, crypto 7, keys 11, transaction schema 19, error mapper 7).
+Checks (all green as of this writing): `npm run typecheck`, `npm run build` (12 routes including `/docs/apple-wallet-shortcut`), `npm run lint` (0 warnings), `npm test` (63 passed: money 19, crypto 7, keys 11, transaction schema 19, error mapper 7).

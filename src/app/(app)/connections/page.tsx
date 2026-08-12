@@ -30,8 +30,7 @@ export default async function ConnectionsPage() {
           <CreateConnectionDialog />
         </div>
         <p className="text-sm text-muted-foreground">
-          Connect the sources that feed transactions into Spendly and the
-          destinations that receive them.
+          Spendly sends each transaction to your connected Notion database.
         </p>
       </div>
 
@@ -51,7 +50,7 @@ export default async function ConnectionsPage() {
                   <CardTitle className="flex items-center gap-2">
                     {conn.label}
                     {conn.enabled ? (
-                      <Badge variant="success">Enabled</Badge>
+                      <Badge variant="success">Connected</Badge>
                     ) : (
                       <Badge variant="muted">Disabled</Badge>
                     )}
