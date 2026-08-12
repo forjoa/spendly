@@ -14,11 +14,11 @@ Apple Wallet
 
 Tasks:
 
-- [ ] Create Next.js application
-- [ ] Create database
-- [ ] Create Transaction model
-- [ ] Create authenticated transaction endpoint (with minimal idempotency + validation)
-- [ ] Create Notion integration
+- [x] Create Next.js application
+- [x] Create database
+- [x] Create Transaction model
+- [x] Create authenticated transaction endpoint (with minimal idempotency + validation)
+- [x] Create Notion integration
 - [ ] Create iOS Shortcut instructions
 - [ ] Process a real transaction
 - [ ] Create the transaction in Notion
