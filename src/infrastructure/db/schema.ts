@@ -44,10 +44,11 @@ export const connectionProviderEnum = pgEnum("connection_provider", [
   "custom_api",
 ])
 
-// ── users (Better Auth managed) ────────────────────────────────────────
-// Better Auth creates its own `user` and `session` tables. We mirror the
-// minimal shape here for foreign keys; Better Auth's generated tables are
-// the source of truth for identity.
+// ── Better Auth tables ─────────────────────────────────────────────────
+// These tables are owned by Spendly in the public schema and mirror Better
+// Auth's expected model shapes (see @better-auth/core get-tables). They are
+// passed to the Drizzle adapter in src/infrastructure/auth/auth.ts so Better
+// Auth reads and writes exclusively through public-schema tables.
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -59,18 +60,57 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 
-export const session = pgTable("session", {
-  id: text("id").primaryKey(),
-  expiresAt: timestamp("expires_at").notNull(),
-  token: text("token").notNull().unique(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-})
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("session_user_idx").on(t.userId)],
+)
+
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("account_user_idx").on(t.userId)],
+)
+
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("verification_identifier_idx").on(t.identifier)],
+)
 
 // ── connections ────────────────────────────────────────────────────────
 
@@ -186,6 +226,8 @@ export const transactionDeliveries = pgTable(
 
 export type User = typeof user.$inferSelect
 export type Session = typeof session.$inferSelect
+export type Account = typeof account.$inferSelect
+export type Verification = typeof verification.$inferSelect
 export type Connection = typeof connections.$inferSelect
 export type ApiKey = typeof apiKeys.$inferSelect
 export type Transaction = typeof transactions.$inferSelect

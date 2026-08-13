@@ -8,8 +8,9 @@ import * as schema from "../db/schema"
   Better Auth server instance.
 
   Email/password only in V0. Sessions stored in Postgres via the Drizzle
-  adapter. The `user` and `session` tables in schema.ts mirror Better Auth's
-  expected schema so our foreign keys stay valid.
+  adapter. The `user`, `session`, `account`, and `verification` tables in
+  schema.ts are owned by Spendly in the public schema and mirror Better
+  Auth's expected model shapes so all auth data lives in one place.
 
   Standard Better Auth environment variables are used:
     BETTER_AUTH_SECRET  — signs session tokens (required in production)
@@ -28,6 +29,8 @@ function buildOptions(): BetterAuthOptions {
       schema: {
         user: schema.user,
         session: schema.session,
+        account: schema.account,
+        verification: schema.verification,
       },
     }),
     baseURL: process.env.BETTER_AUTH_URL,
