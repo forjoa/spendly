@@ -22,7 +22,11 @@ export async function createApiKeyAction(formData: FormData) {
     throw new ValidationError("Label must be 1 to 100 characters")
   }
   const created = await apiKeyService.createKey(user.id, parsed.data.label)
-  revalidatePath("/api-keys")
+  // Do NOT revalidatePath here. Refreshing the page would re-render the
+  // server component tree and unmount the CreateApiKeyDialog, discarding
+  // the plaintext key from component state before the user can copy it.
+  // The key list is refreshed client-side via router.refresh() when the
+  // dialog closes (see create-key-dialog.tsx).
   return {
     rawKey: created.rawKey,
     id: created.record.id,

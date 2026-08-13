@@ -1,5 +1,6 @@
 "use client"
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { Copy, Check } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -21,6 +22,7 @@ import { createApiKeyAction } from "./actions"
 type Created = { rawKey: string; id: string; label: string; keySuffix: string }
 
 export function CreateApiKeyDialog() {
+  const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [label, setLabel] = React.useState("")
   const [pending, setPending] = React.useState(false)
@@ -54,14 +56,20 @@ export function CreateApiKeyDialog() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function handleClose(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      // Refresh the key list now that the dialog is closing. This must
+      // happen after the user has had a chance to copy the plaintext key.
+      // We do not revalidate during creation (see actions.ts) to avoid
+      // unmounting this component and losing the key from state.
+      router.refresh()
+      reset()
+    }
+  }
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o)
-        if (!o) reset()
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogTrigger asChild>
         <Button>Create API key</Button>
       </DialogTrigger>
@@ -76,7 +84,8 @@ export function CreateApiKeyDialog() {
             </DialogHeader>
             <Alert variant="warning">
               <AlertDescription>
-                Store this key somewhere safe. You will not be able to see it again.
+                This key will only be shown once. Copy it now and store it securely.
+                After you close this dialog, the plaintext key is gone forever.
               </AlertDescription>
             </Alert>
             <div className="flex items-center gap-2">
@@ -86,7 +95,7 @@ export function CreateApiKeyDialog() {
               </Button>
             </div>
             <DialogFooter>
-              <Button onClick={() => setOpen(false)}>Done</Button>
+              <Button onClick={() => handleClose(false)}>Done</Button>
             </DialogFooter>
           </>
         ) : (
