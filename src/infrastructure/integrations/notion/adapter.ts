@@ -208,11 +208,42 @@ function extractProperties(json: unknown): NotionPropertiesMap | undefined {
 // ── payload building ───────────────────────────────────────────────────
 
 /**
+ * A Notion property resolved to its actual (untrimmed) name plus its type.
+ * Notion allows property names with leading/trailing whitespace (e.g.
+ * "Date ", "Amount ", "External ID "); we match such properties against the
+ * documented logical names by their trimmed form, but always send the actual
+ * name back to the API so we never rename or recreate the property.
+ */
+interface ResolvedProperty extends NotionProperty {
+  name: string
+}
+
+/**
+ * Build an index from the trimmed property name to the actual Notion
+ * property (with its untrimmed name and type). Trimming is for matching
+ * only; the returned `name` is the original key from the Notion response.
+ */
+function resolveProperties(
+  dbSchema: NotionPropertiesMap,
+): Map<string, ResolvedProperty> {
+  const resolved = new Map<string, ResolvedProperty>()
+  for (const [actualName, prop] of Object.entries(dbSchema)) {
+    resolved.set(actualName.trim(), { name: actualName, type: prop.type })
+  }
+  return resolved
+}
+
+/**
  * Build the Notion page properties for a transaction, mapping each field to
  * the actual property type in the destination database.
  *
  * Required properties (Merchant, Amount, Currency, Date, Type, Source,
- * External ID) must be present. If one is missing, a DestinationError is
+ * External ID) must be present, matched by their trimmed name so that
+ * Notion properties with incidental leading/trailing whitespace still
+ * satisfy the requirement. The payload is keyed by the actual Notion
+ * property name, so existing properties are never renamed or recreated.
+ *
+ * If a required logical property is genuinely absent, a DestinationError is
  * thrown with a diagnostic naming the missing property.
  *
  * Optional properties (Category) are only included when the database has a
@@ -222,10 +253,10 @@ function buildProperties(
   tx: Transaction,
   dbSchema: NotionPropertiesMap,
 ): Record<string, unknown> {
-  // Validate required properties exist in the database.
-  const missing = REQUIRED_PROPERTIES.filter(
-    (name) => !Object.prototype.hasOwnProperty.call(dbSchema, name),
-  )
+  const resolved = resolveProperties(dbSchema)
+
+  // Validate required logical properties exist (matched by trimmed name).
+  const missing = REQUIRED_PROPERTIES.filter((name) => !resolved.has(name))
   if (missing.length > 0) {
     const detail = missing.join(", ")
     console.error(
@@ -240,35 +271,52 @@ function buildProperties(
   const properties: Record<string, unknown> = {}
 
   // Merchant — documented as title.
-  properties["Merchant"] = mapTitle(dbSchema["Merchant"]!, tx.merchant)
+  properties[resolved.get("Merchant")!.name] = mapTitle(
+    resolved.get("Merchant")!,
+    tx.merchant,
+  )
 
   // Amount — documented as text/rich_text, formatted as a currency string.
-  properties["Amount"] = mapText(
-    dbSchema["Amount"]!,
+  const amount = resolved.get("Amount")!
+  properties[amount.name] = mapText(
+    amount,
     formatMinorUnits(tx.amountMinor, tx.currency),
   )
 
   // Currency — documented as select.
-  properties["Currency"] = mapSelect(dbSchema["Currency"]!, tx.currency)
+  properties[resolved.get("Currency")!.name] = mapSelect(
+    resolved.get("Currency")!,
+    tx.currency,
+  )
 
   // Date — documented as date.
-  properties["Date"] = mapDate(dbSchema["Date"]!, tx.date)
+  properties[resolved.get("Date")!.name] = mapDate(
+    resolved.get("Date")!,
+    tx.date,
+  )
 
   // Type — documented as select.
-  properties["Type"] = mapSelect(dbSchema["Type"]!, tx.type)
+  properties[resolved.get("Type")!.name] = mapSelect(
+    resolved.get("Type")!,
+    tx.type,
+  )
 
   // Source — documented as text/rich_text.
-  properties["Source"] = mapText(dbSchema["Source"]!, tx.source)
+  properties[resolved.get("Source")!.name] = mapText(
+    resolved.get("Source")!,
+    tx.source,
+  )
 
   // External ID — documented as text/rich_text.
-  properties["External ID"] = mapText(dbSchema["External ID"]!, tx.externalId)
+  properties[resolved.get("External ID")!.name] = mapText(
+    resolved.get("External ID")!,
+    tx.externalId,
+  )
 
   // Category — optional, only when the database explicitly has the property.
-  if (
-    tx.category &&
-    Object.prototype.hasOwnProperty.call(dbSchema, "Category")
-  ) {
-    properties["Category"] = mapText(dbSchema["Category"]!, tx.category)
+  const category = resolved.get("Category")
+  if (tx.category && category) {
+    properties[category.name] = mapText(category, tx.category)
   }
 
   return properties

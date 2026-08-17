@@ -482,4 +482,89 @@ describe("deliverToNotion", () => {
       expect(logged).not.toContain(TOKEN)
     })
   })
+
+  /*
+    Regression: Notion property names may carry incidental trailing whitespace
+    (seen in production: "Date ", "Amount ", "External ID "). The adapter must
+    match these against the documented logical names by their trimmed form and
+    still deliver successfully, keying the payload with the actual (untrimmed)
+    Notion property name so the database is never renamed or recreated.
+  */
+  describe("property names with trailing whitespace", () => {
+    /** Schema exactly as observed in production: three keys have trailing spaces. */
+    function productionSchema(): Record<string, { type: string }> {
+      return {
+        Merchant: { type: "title" },
+        "Amount ": { type: "rich_text" },
+        Currency: { type: "select" },
+        "Date ": { type: "date" },
+        Type: { type: "select" },
+        Source: { type: "rich_text" },
+        "External ID ": { type: "rich_text" },
+      }
+    }
+
+    it("does not report trailing-whitespace properties as missing", async () => {
+      fetchMock = mockFetch({
+        schemaBody: { properties: productionSchema() },
+      })
+      vi.stubGlobal("fetch", fetchMock)
+
+      // Previously this threw "Notion database is missing required properties:
+      // Amount, Date, External ID". It must now succeed.
+      const result = await deliverToNotion({
+        token: TOKEN,
+        databaseId: DATABASE_ID,
+        transaction: makeTransaction(),
+      })
+
+      expect(result.externalDeliveryId).toBe(PAGE_ID)
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
+    })
+
+    it("sends the actual (untrimmed) Notion property names in the payload", async () => {
+      fetchMock = mockFetch({
+        schemaBody: { properties: productionSchema() },
+      })
+      vi.stubGlobal("fetch", fetchMock)
+
+      await deliverToNotion({
+        token: TOKEN,
+        databaseId: DATABASE_ID,
+        transaction: makeTransaction(),
+      })
+
+      const pageCall = fetchMock.mock.calls.find(
+        (c) =>
+          typeof c[0] === "string" && (c[0] as string).endsWith("/pages"),
+      )
+      const body = JSON.parse((pageCall![1] as RequestInit).body as string)
+      const propNames = Object.keys(body.properties)
+
+      // The trailing-whitespace names are sent verbatim, not trimmed or
+      // recreated as new properties.
+      expect(propNames).toEqual(
+        expect.arrayContaining([
+          "Merchant",
+          "Amount ",
+          "Currency",
+          "Date ",
+          "Type",
+          "Source",
+          "External ID ",
+        ]),
+      )
+      // And the trimmed logical names are NOT present as separate keys.
+      expect(propNames).not.toContain("Amount")
+      expect(propNames).not.toContain("Date")
+      expect(propNames).not.toContain("External ID")
+
+      // The trailing-whitespace Date property still receives a date payload.
+      expect(body.properties["Date "]).toHaveProperty("date")
+      // The trailing-whitespace Amount property still receives a rich_text payload.
+      expect(body.properties["Amount "]).toHaveProperty("rich_text")
+      // The trailing-whitespace External ID property still receives a rich_text payload.
+      expect(body.properties["External ID "]).toHaveProperty("rich_text")
+    })
+  })
 })
