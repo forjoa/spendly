@@ -10,6 +10,24 @@ Security is a core product requirement.
 - Never store credentials in plaintext when persistence is required.
 - Use environment variables for server-side secrets.
 
+## Logging & observability
+
+Structured logging is implemented in `src/lib/logger.ts` and documented in
+`OBSERVABILITY.md`. The logger redacts secrets by key name and by string
+shape, but redaction is defense-in-depth — do not rely on it.
+
+Never log, even via the structured logger:
+
+- API keys (`sk_live_...`), the `Authorization` header, Bearer tokens
+- Notion integration tokens (`ntn_...`)
+- `BETTER_AUTH_SECRET`, `SPENDLY_ENCRYPTION_KEY`, `DATABASE_URL`
+- Cookies, sessions, passwords, raw decrypted credentials, credential hashes
+- Full request body values (log field presence/type/length via `summarizeBody`)
+
+Stack traces may be logged to Axiom/Vercel for diagnostics, but must never be
+returned to the client in an HTTP response. Client responses are always
+sanitized via `errorResponse()`.
+
 ## Authentication
 
 - Every protected resource must belong to an authenticated user.

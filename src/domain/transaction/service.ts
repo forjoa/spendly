@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm"
 import { db, schema } from "@/infrastructure/db/client"
 import type { Transaction, TransactionDelivery as TransactionDeliveryRow } from "@/infrastructure/db/schema"
 import { ValidationError, DestinationError } from "@/lib/errors"
+import { log } from "@/lib/logger"
 import * as txRepo from "./repository"
 import * as deliveryRepo from "./delivery-repository"
 import { connectionRepo } from "@/domain/connection/repository"
@@ -83,6 +84,11 @@ async function deliverToDestinations(
     "notion",
   )
   if (!notionConnection) {
+    log.info("transaction.notion.delivery.skipped", {
+      transactionId: transaction.id,
+      deliveryProvider: "notion",
+      reason: "no-connection",
+    })
     return outcomes
   }
 
@@ -93,6 +99,12 @@ async function deliverToDestinations(
   )
 
   if (existingDelivery?.status === "delivered") {
+    log.info("transaction.notion.delivery.skipped", {
+      transactionId: transaction.id,
+      deliveryProvider: "notion",
+      reason: "already-delivered",
+      externalDeliveryId: existingDelivery.externalDeliveryId ?? undefined,
+    })
     return [
       {
         provider: "notion",

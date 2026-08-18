@@ -116,11 +116,13 @@ Progress against ROADMAP.md phases:
 - Transactions list (`/transactions`): server page shows recent transactions with merchant, amount (integer minor units via `Amount`), date, source, and per-destination delivery status badges (`StatusBadge`). Uses `listTransactionsWithDeliveries` in the transaction service.
 - Overview (`/overview`): dashboard cards (recent expense total, connection count, active API-key count) plus a recent-spending table and a get-started empty state when nothing is configured.
 - Settings (`/settings`): account details (name, email, verified) and a client `SignOutButton` that calls `authClient.signOut`.
+- Observability: structured JSON logger (`src/lib/logger.ts`) with request-scoped context via `AsyncLocalStorage`, secret redaction by key name and string shape, and an optional Axiom sink (`src/infrastructure/observability/axiom-sink.ts`) for long-term log retention on Vercel. The transaction ingestion flow is fully instrumented via `withApiLogging()` (`src/app/api/_lib/api-handler.ts`): every event from `transaction.request.received` through `transaction.request.completed` shares a `requestId`. Zod validation failures log full issues (`transaction.validation.failed`); Notion delivery emits `notion.delivery.started/succeeded/failed`. See `OBSERVABILITY.md` for the event catalog and Axiom setup.
 
 Not yet implemented (intentional, per V0 scope):
 
 - Drizzle migration has not been applied to a live database yet (no Neon instance configured in this environment).
 - E2E test of the full Apple Wallet → Spendly → Notion loop against real services.
 - Apple Wallet shortcut setup instructions are at `docs/apple-wallet-shortcut.md` and rendered at `/docs/apple-wallet-shortcut`. Test procedures are at `scripts/v0-test.sh` and `scripts/v0-failure-test.sh` (not yet executed against live infrastructure).
+- Axiom dataset + token must be created manually and set as Vercel env vars (`AXIOM_DATASET`, `AXIOM_TOKEN`) for production log retention; without them the sink is a no-op and logs go to console only.
 
-Checks (all green as of this writing): `npm run typecheck`, `npm run build` (12 routes including `/docs/apple-wallet-shortcut`), `npm run lint` (0 warnings), `npm test` (63 passed: money 19, crypto 7, keys 11, transaction schema 19, error mapper 7).
+Checks (all green as of this writing): `npm run typecheck`, `npm run build` (12 routes including `/docs/apple-wallet-shortcut`), `npm run lint` (0 warnings), `npm test` (137 passed: money 19, crypto 7, keys 11, transaction schema 19, error mapper 7, logger 13, body-inspect 6, axiom-sink 11, route observability 8, api-key auth 6, plus existing notion/crypto tests).

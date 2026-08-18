@@ -1,5 +1,6 @@
 import "server-only"
 import { DestinationError } from "@/lib/errors"
+import { log } from "@/lib/logger"
 import type { Transaction } from "@/infrastructure/db/schema"
 import { formatMinorUnits } from "@/lib/money"
 
@@ -66,6 +67,13 @@ export async function deliverToNotion(
     process.env.NOTION_API_VERSION ??
     DEFAULT_NOTION_API_VERSION
 
+  log.info("transaction.notion.delivery.started", {
+    transactionId: transaction.id,
+    databaseId,
+  })
+
+  const startedAt = performance.now()
+
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     "Notion-Version": apiVersion,
@@ -93,6 +101,7 @@ export async function deliverToNotion(
     })
   } catch (err) {
     clearTimeout(timeout)
+    logNotionFailure(transaction.id, performance.now() - startedAt, undefined, err)
     throw new DestinationError(
       err instanceof Error && err.name === "AbortError"
         ? "Notion request timed out"
@@ -110,6 +119,14 @@ export async function deliverToNotion(
       `[notion] page creation failed for database ${databaseId}: ` +
         `HTTP ${response.status} ${errorDetail.code} — ${errorDetail.message}`,
     )
+    logNotionFailure(
+      transaction.id,
+      performance.now() - startedAt,
+      response.status,
+      undefined,
+      "page-creation",
+      errorDetail,
+    )
     throw new DestinationError(sanitizeNotionError(response.status))
   }
 
@@ -117,13 +134,23 @@ export async function deliverToNotion(
   try {
     json = await response.json()
   } catch {
+    logNotionFailure(transaction.id, performance.now() - startedAt, response.status, undefined)
     throw new DestinationError("Notion returned an unreadable response")
   }
 
   const pageId = extractPageId(json)
   if (!pageId) {
+    logNotionFailure(transaction.id, performance.now() - startedAt, response.status, undefined)
     throw new DestinationError("Notion did not return a page id")
   }
+
+  log.info("transaction.notion.delivery.succeeded", {
+    transactionId: transaction.id,
+    deliveryProvider: "notion",
+    durationMs: Math.round(performance.now() - startedAt),
+    notionStatus: response.status,
+    externalDeliveryId: pageId,
+  })
   return { externalDeliveryId: pageId }
 }
 
@@ -149,7 +176,7 @@ async function fetchDatabaseSchema(
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-
+  const schemaStartedAt = performance.now()
   let response: Response
   try {
     response = await fetch(url, {
@@ -159,6 +186,7 @@ async function fetchDatabaseSchema(
     })
   } catch (err) {
     clearTimeout(timeout)
+    logNotionFailure(databaseId, 0, undefined, err, "schema-fetch")
     throw new DestinationError(
       err instanceof Error && err.name === "AbortError"
         ? "Notion schema request timed out"
@@ -173,6 +201,14 @@ async function fetchDatabaseSchema(
     console.error(
       `[notion] could not fetch database schema for ${databaseId}: ` +
         `HTTP ${response.status} ${errorDetail.code} — ${errorDetail.message}`,
+    )
+    logNotionFailure(
+      databaseId,
+      performance.now() - schemaStartedAt,
+      response.status,
+      undefined,
+      "schema-fetch",
+      errorDetail,
     )
     throw new DestinationError(sanitizeNotionError(response.status))
   }
@@ -263,6 +299,13 @@ function buildProperties(
       `[notion] database is missing required properties: ${detail}. ` +
         `Present properties: ${Object.keys(dbSchema).join(", ")}`,
     )
+    log.error("transaction.notion.delivery.failed", {
+      transactionId: tx.id,
+      deliveryProvider: "notion",
+      stage: "schema-check",
+      missingProperties: missing,
+      presentProperties: Object.keys(dbSchema),
+    })
     throw new DestinationError(
       `Notion database is missing required properties: ${missing.join(", ")}`,
     )
@@ -386,6 +429,34 @@ function mapDate(prop: NotionProperty, value: Date): unknown {
 }
 
 // ── error handling ─────────────────────────────────────────────────────
+
+/**
+ * Emit a structured Notion delivery failure event. `transactionOrDbId` is the
+ * transaction id when known (page-creation path) or the database id otherwise
+ * (schema-fetch path, which runs before the transaction is associated). The
+ * Notion token is NEVER included — it lives only in the request header.
+ */
+function logNotionFailure(
+  transactionOrDbId: string,
+  durationMs: number,
+  notionStatus: number | undefined,
+  err: unknown,
+  stage: "schema-fetch" | "schema-check" | "page-creation" = "page-creation",
+  errorDetail?: { code: string; message: string },
+): void {
+  log.error("transaction.notion.delivery.failed", {
+    transactionId: transactionOrDbId,
+    deliveryProvider: "notion",
+    stage,
+    durationMs: Math.round(durationMs),
+    notionStatus,
+    errorCode: errorDetail?.code,
+    errorMessage: errorDetail?.message
+      ? errorDetail.message.slice(0, 300)
+      : undefined,
+    errorType: err instanceof Error ? err.name : undefined,
+  })
+}
 
 /** Extract the page id from a Notion create-page response. */
 function extractPageId(json: unknown): string | undefined {

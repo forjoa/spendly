@@ -519,7 +519,14 @@ describe("deliverToNotion", () => {
       })
 
       expect(result.externalDeliveryId).toBe(PAGE_ID)
-      expect(consoleErrorSpy).not.toHaveBeenCalled()
+      // No Notion ERROR diagnostic should be emitted on a clean success. The
+      // structured logger emits info-level events via console.error (stderr
+      // JSON lines), so we assert the absence of a `[notion]` error prefix
+      // rather than zero console.error calls.
+      const notionErrors = consoleErrorSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .filter((s: string) => s.includes("[notion]"))
+      expect(notionErrors).toHaveLength(0)
     })
 
     it("sends the actual (untrimmed) Notion property names in the payload", async () => {

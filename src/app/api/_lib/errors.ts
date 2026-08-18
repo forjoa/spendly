@@ -1,3 +1,4 @@
+import "server-only"
 import { NextResponse } from "next/server"
 import {
   SpendlyError,
@@ -6,11 +7,19 @@ import {
   DestinationError,
   ConfigurationError,
 } from "@/lib/errors"
+import { log } from "@/lib/logger"
 
 /*
   Map domain errors to HTTP responses without leaking internals.
 
   All responses use a consistent { error: { code, message } } shape.
+
+  Logging policy:
+  - Known SpendlyErrors and Zod failures are logged at the stage that raised
+    them (auth, validation, ingest, notion) with full diagnostic context.
+  - errorResponse therefore only logs UNKNOWN errors here, so unexpected
+    server failures get a stack trace in Axiom/Vercel without ever being
+    returned to the client.
 */
 
 export function errorResponse(error: unknown): NextResponse {
@@ -35,7 +44,15 @@ export function errorResponse(error: unknown): NextResponse {
     )
   }
 
-  // Never expose the raw message of an unknown error.
+  // Unknown error: log full context (incl. stack) for diagnostics, but return
+  // a sanitized message to the client.
+  log.error("transaction.request.error", {
+    errorCode: "INTERNAL_ERROR",
+    errorType: error instanceof Error ? error.name : typeof error,
+    message: error instanceof Error ? error.message : String(error).slice(0, 500),
+    stack: error instanceof Error ? error.stack : undefined,
+  })
+
   return NextResponse.json(
     { error: { code: "INTERNAL_ERROR", message: "Something went wrong" } },
     { status: 500 },
