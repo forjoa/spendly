@@ -51,6 +51,71 @@ describe("transactionInputSchema", () => {
     expect(result.success).toBe(false)
   })
 
+  describe("amountMinor boundary contract (JSON number → exact integer)", () => {
+    it.each([599, 1000, 99])(
+      "accepts integer-valued number %i and yields an integer",
+      (amount) => {
+        const result = transactionInputSchema.parse({ ...validInput, amountMinor: amount })
+        expect(result.amountMinor).toBe(amount)
+        expect(Number.isSafeInteger(result.amountMinor)).toBe(true)
+      },
+    )
+
+    it("treats the JSON text 599.0 as the integer 599", () => {
+      // JSON has no int type: "599.0" and "599" parse to the same double.
+      const body = JSON.parse(
+        '{"merchant":"Coffee Shop","amountMinor":599.0,"currency":"EUR","date":"2025-01-15T10:30:00Z","source":"apple_wallet","externalId":"tx_float"}',
+      )
+      const result = transactionInputSchema.parse(body)
+      expect(result.amountMinor).toBe(599)
+      expect(Number.isSafeInteger(result.amountMinor)).toBe(true)
+    })
+
+    it.each([599.5, 99.99])(
+      "rejects fractional number %s without rounding or truncating",
+      (amount) => {
+        const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: amount })
+        expect(result.success).toBe(false)
+      },
+    )
+
+    it("rejects 5.99 (major units) instead of silently converting", () => {
+      const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: 5.99 })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a floating-point artifact such as 19.99 * 100", () => {
+      // IEEE-754: 19.99 * 100 = 1998.9999999999998, not 1999. Never repaired.
+      const artifact = 19.99 * 100
+      expect(Number.isInteger(artifact)).toBe(false)
+      const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: artifact })
+      expect(result.success).toBe(false)
+    })
+
+    it.each([NaN, Infinity, -Infinity])("rejects non-finite value %s", (amount) => {
+      const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: amount })
+      expect(result.success).toBe(false)
+    })
+
+    it.each(["599", "99.99", "abc"])("rejects string %s", (amount) => {
+      const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: amount })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects integers beyond the safe range (no silent precision loss)", () => {
+      const result = transactionInputSchema.safeParse({
+        ...validInput,
+        amountMinor: 2 ** 53,
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it("still accepts negative integers (domain permits signed amounts)", () => {
+      const result = transactionInputSchema.parse({ ...validInput, amountMinor: -599 })
+      expect(result.amountMinor).toBe(-599)
+    })
+  })
+
   it("rejects an empty merchant", () => {
     const result = transactionInputSchema.safeParse({ ...validInput, merchant: "" })
     expect(result.success).toBe(false)

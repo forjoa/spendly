@@ -94,6 +94,10 @@ The data Spendly needs:
 
 The amount must be in the smallest unit of the currency. For EUR, GBP, or USD, that is cents or pence. So 5.99 EUR becomes 599. This avoids rounding problems with decimal numbers.
 
+Spendly accepts `amountMinor` as a JSON number whose value is a whole number. `599` and `599.0` are the same number in JSON, and both work. Values with a real fraction — like `599.5`, or `5.99` (euros instead of cents) — are rejected with a 422 error. Spendly never rounds, truncates, or guesses an amount.
+
+If you compute the cents inside the Shortcut by multiplying the price by 100, be careful: Shortcuts uses binary floating-point math, so 19.99 × 100 can come out as 1998.9999999999998, which Spendly will reject. To avoid this, add a "Round" action right after the multiplication, rounding to the nearest whole number. This only removes the math noise — Spendly still rejects any amount that is genuinely not a whole number.
+
 ### Step 5 — Build the JSON body
 
 Add a "Dictionary" action to the Shortcut. Set these keys:
@@ -153,7 +157,7 @@ Spendly sends back an error with a status code:
 | Status code | What it means | What to do |
 |---|---|---|
 | 401 | The API key is missing, wrong, or revoked | Check the key in your Spendly API keys page and update the Shortcut |
-| 422 | The transaction data is invalid | Check that all required fields are present and the amount is an integer in cents |
+| 422 | The transaction data is invalid | Check that all required fields are present and that `amountMinor` is a whole number in the smallest currency unit (no decimals) |
 | 502 | Spendly saved the transaction but could not deliver it to Notion | Check your Notion connection and database in Spendly |
 | 500 | Something went wrong on Spendly's side | Try again later |
 

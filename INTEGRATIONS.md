@@ -112,6 +112,8 @@ Example:
 
 `amountMinor` is an integer in the currency's minor units (e.g. cents). Amounts are never floating-point.
 
+At the API boundary, `amountMinor` arrives as a JSON number (JSON has no integer type, and clients such as iOS Shortcuts can only emit doubles). Spendly accepts any number whose value is an exact safe integer — in JSON, `599` and `599.0` are the same number — and rejects fractional values (`599.5`, `5.99`) instead of rounding or truncating them. After validation the domain and the database see only integers. See `amountMinorSchema` in `src/domain/transaction/schema.ts`.
+
 Adapters transform this model into the format required by the destination.
 
 ## Reliability
