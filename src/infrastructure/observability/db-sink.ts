@@ -101,25 +101,27 @@ export async function flushDbLogs(): Promise<void> {
 
   // Drain atomically: this request's bucket, plus the global bucket (events
   // emitted outside any request context, which have no other flush trigger).
-  const batch: LogEvent[] = []
-  const own = _buffers.get(key)
-  if (own) {
-    _buffers.delete(key)
-    batch.push(...own)
-  }
-  if (key !== GLOBAL_BUCKET) {
-    const global = _buffers.get(GLOBAL_BUCKET)
-    if (global) {
-      _buffers.delete(GLOBAL_BUCKET)
-      batch.push(...global)
-    }
-  }
-  if (batch.length === 0) return
+  const own = key === GLOBAL_BUCKET ? undefined : _buffers.get(key)
+  const global = _buffers.get(GLOBAL_BUCKET)
+  if (own) _buffers.delete(key)
+  if (global) _buffers.delete(GLOBAL_BUCKET)
+  const bucket = key === GLOBAL_BUCKET ? (own ?? global) : own
 
+  const ownEvents = bucket ?? []
+  const globalEvents = key === GLOBAL_BUCKET ? [] : (global ?? [])
+  if (ownEvents.length === 0 && globalEvents.length === 0) return
+
+  // userId backfill applies ONLY to this request's own events. Global events
+  // were emitted outside any request and must never be attributed to the
+  // user that happens to flush them (per-user isolation in /logs).
   const fallbackUserId = typeof ctx?.userId === "string" ? ctx.userId : undefined
+  const records = [
+    ...ownEvents.map((e) => toRecord(e, fallbackUserId)),
+    ...globalEvents.map((e) => toRecord(e)),
+  ]
 
   try {
-    await recordApplicationLogs(batch.map((e) => toRecord(e, fallbackUserId)))
+    await recordApplicationLogs(records)
   } catch (err) {
     // Do NOT route this through the logger: that would recurse into this
     // same sink. Console only; the message is sanitized and secret-free.
@@ -128,7 +130,7 @@ export async function flushDbLogs(): Promise<void> {
       JSON.stringify({
         event: "db_log_sink.flush.failed",
         error: message.slice(0, 200),
-        eventCount: batch.length,
+        eventCount: records.length,
       }),
     )
   }

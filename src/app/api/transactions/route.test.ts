@@ -57,8 +57,17 @@ vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({ get: () => null })),
 }))
 
+// Mock the application-log persistence boundary so the db sink's flush can be
+// observed without a database (the sink only registers when DATABASE_URL is
+// set; see the persistence describe below).
+vi.mock("@/domain/log/service", () => ({
+  recordApplicationLogs: vi.fn(async () => undefined),
+  listApplicationLogs: vi.fn(),
+}))
+
 const { authenticateApiKey } = await import("@/infrastructure/auth/api-key")
 const { ingest } = await import("@/domain/transaction/service")
+const { recordApplicationLogs } = await import("@/domain/log/service")
 const { POST } = await import("@/app/api/transactions/route")
 const {
   clearSinks,
@@ -297,5 +306,87 @@ describe("POST /api/transactions — requestId preservation", () => {
     const ids = new Set(capture.events.map((e) => e.requestId))
     expect(ids.size).toBe(1)
     expect([...ids][0]).toBe("test-req-id")
+  })
+
+  it("every event carries method and path from the request context", async () => {
+    await POST(makeRequest(VALID_BODY))
+    for (const e of capture.events) {
+      expect(e.method).toBe("POST")
+      expect(e.path).toBe("/api/transactions")
+    }
+    const completed = eventsByEvent().get("transaction.request.completed")!
+    expect(completed.statusCode).toBe(201)
+    expect(typeof completed.durationMs).toBe("number")
+  })
+})
+
+describe("POST /api/transactions — PostgreSQL persistence before the response", () => {
+  afterEach(() => {
+    delete process.env.DATABASE_URL
+  })
+
+  it("persists the full request story to the db sink BEFORE the handler resolves", async () => {
+    // With DATABASE_URL set, the db sink registers and the wrapper awaits
+    // flushDbLogs() before returning the response — so by the time POST
+    // resolves, nothing is left buffered in memory (serverless-safe).
+    process.env.DATABASE_URL = DATABASE_URL
+    const res = await POST(makeRequest(VALID_BODY))
+    expect(res.status).toBe(201)
+
+    expect(recordApplicationLogs).toHaveBeenCalledTimes(1)
+    const records = vi.mocked(recordApplicationLogs).mock.calls[0]![0] as Array<
+      Record<string, unknown>
+    >
+    const events = records.map((r) => r.event)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        "transaction.request.received",
+        "transaction.body.parsed",
+        "transaction.ingest.started",
+        "transaction.persisted",
+        "transaction.request.completed",
+      ]),
+    )
+    // Every persisted row is correlated and attributed to the auth user.
+    for (const r of records) {
+      expect(r.requestId).toBe("test-req-id")
+      expect(r.userId).toBe("user-1")
+    }
+    // The completed row is self-describing for /logs: method, path, status,
+    // duration all present in the redacted metadata payload.
+    const completed = records.find(
+      (r) => r.event === "transaction.request.completed",
+    )!
+    const metadata = completed.metadata as Record<string, unknown>
+    expect(metadata.method).toBe("POST")
+    expect(metadata.path).toBe("/api/transactions")
+    expect(metadata.statusCode).toBe(201)
+    expect(typeof metadata.durationMs).toBe("number")
+    // Nothing secret reaches the database boundary.
+    expect(JSON.stringify(records)).not.toContain(API_KEY)
+    expect(JSON.stringify(records)).not.toContain("Bearer ")
+  })
+
+  it("persists a 422 with its validation issues", async () => {
+    process.env.DATABASE_URL = DATABASE_URL
+    const res = await POST(makeRequest({ ...VALID_BODY, amountMinor: "599" }))
+    expect(res.status).toBe(422)
+
+    const records = vi.mocked(recordApplicationLogs).mock.calls[0]![0] as Array<
+      Record<string, unknown>
+    >
+    const failed = records.find(
+      (r) => r.event === "transaction.validation.failed",
+    )!
+    const issues = (failed.metadata as Record<string, unknown>).issues as Array<
+      Record<string, unknown>
+    >
+    expect(issues.flatMap((i) => i.path as unknown[])).toContain("amountMinor")
+    const completed = records.find(
+      (r) => r.event === "transaction.request.completed",
+    )!
+    expect(
+      (completed.metadata as Record<string, unknown>).statusCode,
+    ).toBe(422)
   })
 })

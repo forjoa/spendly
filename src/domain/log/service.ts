@@ -67,6 +67,8 @@ export async function listApplicationLogs(
     level: query.level,
     event: query.event,
     requestId: query.requestId,
+    path: query.path,
+    statusCode: query.statusCode,
     from: query.from ? new Date(query.from) : undefined,
     to: query.to ? new Date(query.to) : undefined,
     limit: LOG_PAGE_SIZE + 1,

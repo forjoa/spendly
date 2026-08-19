@@ -1,5 +1,5 @@
 import "server-only"
-import { and, desc, eq, gte, lte, type SQL } from "drizzle-orm"
+import { and, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm"
 import { db, schema } from "@/infrastructure/db/client"
 import type { ApplicationLog, NewApplicationLog } from "@/infrastructure/db/schema"
 
@@ -19,6 +19,8 @@ export interface ListApplicationLogsFilter {
   level?: "info" | "warn" | "error"
   event?: string
   requestId?: string
+  path?: string
+  statusCode?: number
   from?: Date
   to?: Date
   limit: number
@@ -34,6 +36,19 @@ export async function listByUser(
   if (filter.event) conditions.push(eq(schema.applicationLogs.event, filter.event))
   if (filter.requestId) {
     conditions.push(eq(schema.applicationLogs.requestId, filter.requestId))
+  }
+  // Request attributes live in the redacted metadata payload (jsonb). The
+  // ->> extraction is side-effect free and returns null when absent, so
+  // rows without the attribute simply do not match an active filter.
+  if (filter.path) {
+    conditions.push(
+      sql`${schema.applicationLogs.metadata} ->> 'path' = ${filter.path}`,
+    )
+  }
+  if (filter.statusCode !== undefined) {
+    conditions.push(
+      sql`${schema.applicationLogs.metadata} ->> 'statusCode' = ${String(filter.statusCode)}`,
+    )
   }
   if (filter.from) conditions.push(gte(schema.applicationLogs.createdAt, filter.from))
   if (filter.to) conditions.push(lte(schema.applicationLogs.createdAt, filter.to))

@@ -1,6 +1,6 @@
 import "server-only"
 import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless"
-import { Pool } from "@neondatabase/serverless"
+import { Pool, neonConfig } from "@neondatabase/serverless"
 import * as schema from "./schema"
 
 /*
@@ -9,7 +9,22 @@ import * as schema from "./schema"
   Server-only. Reads DATABASE_URL from the environment. The pool is created
   lazily on first use so importing the module (e.g. during `next build` page
   data collection) does not require a live DATABASE_URL.
+
+  Local development without a Neon instance: set DATABASE_WS_PROXY (e.g.
+  "localhost:4444/v2") to route the driver through a local WebSocket→TCP
+  proxy (neondatabase/wsproxy) in front of a plain PostgreSQL. Unset in
+  production — Vercel connects to Neon directly.
 */
+
+if (process.env.DATABASE_WS_PROXY) {
+  neonConfig.wsProxy = process.env.DATABASE_WS_PROXY
+  neonConfig.useSecureWebSocket = false
+  // Local proxies front plain PostgreSQL: no TLS, and no pipelined startup
+  // (wsproxy + SCRAM cannot negotiate a pipelined auth message).
+  neonConfig.forceDisablePgSSL = true
+  neonConfig.pipelineTLS = false
+  neonConfig.pipelineConnect = false
+}
 
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL

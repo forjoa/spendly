@@ -25,6 +25,10 @@ export interface LogExplorerItem {
   message: string | null
   requestId: string | null
   transactionId: string | null
+  method: string | null
+  path: string | null
+  statusCode: number | null
+  durationMs: number | null
   metadata: Record<string, unknown> | null
 }
 
@@ -32,6 +36,8 @@ export interface LogExplorerFilters {
   level: string
   event: string
   requestId: string
+  path: string
+  statusCode: string
   from: string
   to: string
 }
@@ -71,6 +77,8 @@ function buildQuery(filters: LogExplorerFilters, page: number): string {
   if (filters.level) params.set("level", filters.level)
   if (filters.event) params.set("event", filters.event)
   if (filters.requestId) params.set("requestId", filters.requestId)
+  if (filters.path) params.set("path", filters.path)
+  if (filters.statusCode) params.set("statusCode", filters.statusCode)
   if (filters.from) params.set("from", filters.from)
   if (filters.to) params.set("to", filters.to)
   if (page > 1) params.set("page", String(page))
@@ -89,6 +97,21 @@ function LogDetail({ item }: { item: LogExplorerItem }) {
         <div className="flex flex-col gap-0.5">
           <span className="font-medium text-muted-foreground">Request</span>
           <span className="font-mono break-all">{item.requestId ?? "—"}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium text-muted-foreground">Endpoint</span>
+          <span className="font-mono break-all">
+            {item.method || item.path
+              ? `${item.method ?? ""} ${item.path ?? ""}`.trim()
+              : "—"}
+          </span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium text-muted-foreground">Status / duration</span>
+          <span className="font-mono">
+            {item.statusCode ?? "—"}
+            {item.durationMs !== null ? ` · ${item.durationMs} ms` : ""}
+          </span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="font-medium text-muted-foreground">Transaction</span>
@@ -121,7 +144,7 @@ export function LogExplorer({ items, filters, page, hasMore }: LogExplorerProps)
       <Card>
         <CardContent className="pt-6">
           <form method="get" action="/logs" className="flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="level">Level</Label>
                 <select
@@ -152,6 +175,25 @@ export function LogExplorer({ items, filters, page, hasMore }: LogExplorerProps)
                   name="requestId"
                   placeholder="abc123…"
                   defaultValue={filters.requestId}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="path">Path</Label>
+                <Input
+                  id="path"
+                  name="path"
+                  placeholder="/api/transactions"
+                  defaultValue={filters.path}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="statusCode">Status code</Label>
+                <Input
+                  id="statusCode"
+                  name="statusCode"
+                  inputMode="numeric"
+                  placeholder="422"
+                  defaultValue={filters.statusCode}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -220,6 +262,25 @@ export function LogExplorer({ items, filters, page, hasMore }: LogExplorerProps)
                       <span className="min-w-0 flex-1 truncate font-mono text-xs">
                         {item.event}
                       </span>
+                      {item.statusCode !== null ? (
+                        <span
+                          className={cn(
+                            "hidden w-12 shrink-0 text-right font-mono text-xs md:block",
+                            item.statusCode >= 500
+                              ? "text-destructive"
+                              : item.statusCode >= 400
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {item.statusCode}
+                        </span>
+                      ) : null}
+                      {item.durationMs !== null ? (
+                        <span className="hidden w-16 shrink-0 text-right font-mono text-xs text-muted-foreground lg:block">
+                          {item.durationMs} ms
+                        </span>
+                      ) : null}
                       <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground sm:block">
                         {formatDate(item.createdAt)}
                       </span>

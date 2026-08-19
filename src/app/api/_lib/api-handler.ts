@@ -50,7 +50,9 @@ export function withApiLogging(handler: ApiHandler): ApiHandler {
     const requestId = await resolveRequestId()
     const context: LogContext = {
       requestId,
-      // Anonymized path component (no query string) for grouping queries.
+      // Method + anonymized path (no query string) on every event of this
+      // request, so each persisted row is self-describing in /logs.
+      method: request.method,
       path: new URL(request.url).pathname,
     }
 

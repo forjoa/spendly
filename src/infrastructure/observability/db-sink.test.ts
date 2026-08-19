@@ -202,6 +202,24 @@ describe("db sink per-request isolation", () => {
     expect(events).toContain("system.event")
     expect(events).toContain("r1.event")
   })
+
+  it("never attributes global-bucket events to the user that flushes them", async () => {
+    // Per-user isolation: events emitted outside any request context have no
+    // userId and must stay userId = null even when the flushing request is
+    // authenticated — otherwise they would leak into that user's /logs view.
+    ensureDbSink()
+    log.info("system.startup", { note: "no request context" })
+    await runWithLogContext({ requestId: "r1" }, async () => {
+      attachLogContext({ userId: "user-1" })
+      log.info("r1.event", {})
+      await flushDbLogs()
+    })
+    const records = flushedBatches()[0]!
+    const global = records.find((r) => r.event === "system.startup")!
+    const own = records.find((r) => r.event === "r1.event")!
+    expect(global.userId).toBeUndefined()
+    expect(own.userId).toBe("user-1")
+  })
 })
 
 describe("db sink fail-safe", () => {

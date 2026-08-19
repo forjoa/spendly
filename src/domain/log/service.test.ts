@@ -155,4 +155,34 @@ describe("listApplicationLogs", () => {
     // is harmless because Drizzle parameterizes all values.
     expect(result.success).toBe(false)
   })
+
+  it("passes path and statusCode filters through to the repository", async () => {
+    await listApplicationLogs("user-1", {
+      path: "/api/transactions",
+      statusCode: "422",
+    })
+    const [, filter] = vi.mocked(listByUser).mock.calls[0]!
+    expect(filter.path).toBe("/api/transactions")
+    expect(filter.statusCode).toBe(422)
+  })
+
+  it("ignores an out-of-range statusCode filter instead of failing", async () => {
+    await listApplicationLogs("user-1", { statusCode: "9999" })
+    const [, filter] = vi.mocked(listByUser).mock.calls[0]!
+    expect(filter.statusCode).toBeUndefined()
+  })
+
+  it("a user only ever queries their own logs (mandatory userId scope)", async () => {
+    // The repository is always called with the caller's userId; there is no
+    // parameter path by which another user's id can be supplied.
+    await listApplicationLogs("user-A", { requestId: "shared-req" })
+    await listApplicationLogs("user-B", { requestId: "shared-req" })
+    const calls = vi.mocked(listByUser).mock.calls
+    expect(calls[calls.length - 2]![0]).toBe("user-A")
+    expect(calls[calls.length - 1]![0]).toBe("user-B")
+    // userId is never part of the client-controllable filter object.
+    await listApplicationLogs("user-A", { userId: "user-B" })
+    const [, filter] = vi.mocked(listByUser).mock.calls.at(-1)!
+    expect(filter).not.toHaveProperty("userId")
+  })
 })

@@ -6,22 +6,43 @@ to answer, with certainty:
 > What did `POST /api/transactions` receive during a real purchase, and where
 > exactly did it fail?
 
+**PostgreSQL (`application_log`) is the source of truth for application
+logs.** The `/logs` UI reads exclusively from it. Axiom is a secondary,
+best-effort sink for external infrastructure debugging: Spendly never depends
+on Axiom, and an Axiom outage affects nothing (requests, `/logs`, auth and
+Notion delivery keep working).
+
 ## Architecture
 
 ```
 request
-  └─ withApiLogging()              establishes requestId + LogContext
+  └─ withApiLogging()              establishes requestId + LogContext (method, path)
       ├─ transaction.request.received
       ├─ authenticateApiKey()      auth.success / auth.failure
       ├─ transaction.body.parsed   (field presence/types, no values)
       ├─ Zod safeParse             transaction.validation.failed (full issues)
       ├─ ingest()                  transaction.ingest.started / .persisted / .failed
       │   └─ Notion adapter        notion.delivery.started / .succeeded / .failed
-      └─ transaction.request.completed (statusCode, durationMs)
+      ├─ transaction.request.completed (statusCode, durationMs)
+      └─ await flushDbLogs()       INSERT batch into application_log
+          await flushAxiom()       best-effort NDJSON to Axiom
 ```
 
 Every event carries the same `requestId`, so a single request is fully
 correlatable end-to-end.
+
+### Flush guarantee (serverless-safe)
+
+The wrapper **awaits both flushes inside the request handler, before the
+response is returned**. A request therefore never ends with logs still
+sitting in memory: no dependence on a later request, a timer, or the
+function staying warm. Buffering is per-request (keyed by `requestId`) so
+concurrent requests never share a batch; buffering exists only to backfill
+the authenticated `userId` onto the request's own pre-auth events at flush
+time — it is not fire-and-forget batching. Fail-safe means "a logging
+failure never breaks the request", not "logs may be dropped silently": a
+flush failure emits a distinct, greppable console line
+(`db_log_sink.flush.failed` / `axiom.ingest.failed`).
 
 ### Components
 
@@ -105,17 +126,23 @@ The same events are also persisted to the `application_log` table and are
 visible to the authenticated user at `/logs`:
 
 - Every query is scoped by the session's `userId`; a user can never see
-  another user's logs.
+  another user's logs. The `userId` is not a client-controllable filter.
 - Events emitted after authentication carry `userId` via the log context;
   the db sink backfills it onto the request's pre-auth events
   (`transaction.request.received`, `transaction.body.parsed`) at flush time,
   so a full operation is reconstructable by `requestId` + `userId` +
-  `transactionId`.
+  `transactionId`. The backfill applies ONLY to the flushing request's own
+  events: events emitted outside any request context (global bucket) keep
+  `userId = null` even when the request that flushes them is authenticated.
 - Events from requests that never authenticate keep `userId = null` and are
   visible only in Axiom (they appear in no user's /logs view).
-- Filters: level, event, request id, UTC time range; paginated (25/page).
-  Selecting a log shows timestamp, request id, transaction id, message and
-  the redacted metadata as JSON.
+- Filters: level, event, request id, path, status code, UTC time range;
+  paginated (25/page). Selecting a log shows timestamp, request id,
+  transaction id, method/path, status/duration, message and the redacted
+  metadata as JSON. `method`, `path`, `statusCode` and `durationMs` live in
+  the event metadata (jsonb) — every event of the request carries
+  method+path from the log context, and the `request.completed` event
+  carries the status code and duration.
 
 Schema: see DATABASE.md (`ApplicationLog`).
 
@@ -134,8 +161,12 @@ scrubbing, so a secret embedded in an unexpected field is still scrubbed.
 
 ## Axiom configuration
 
-Axiom is optional. Without configuration, logs still emit to `console`
-(stderr JSON lines), which Vercel captures for short-term retention.
+Axiom is a strictly secondary, best-effort sink. `application_log`
+(PostgreSQL) powers `/logs`; Axiom only adds external retention for
+infrastructure debugging. Without configuration, logs emit to `console`
+(stderr JSON lines), which Vercel captures for short-term retention, and
+everything keeps working. A failing Axiom ingest never affects the request,
+the PostgreSQL sink, or `/logs`.
 
 To enable Axiom (free tier is sufficient for debugging):
 

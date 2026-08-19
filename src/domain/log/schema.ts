@@ -34,6 +34,9 @@ export const applicationLogQuerySchema = z.object({
   level: logLevelSchema.optional(),
   event: z.string().trim().max(256).optional(),
   requestId: z.string().trim().max(256).optional(),
+  // Request attributes live in metadata (jsonb); matched exactly.
+  path: z.string().trim().max(256).optional(),
+  statusCode: z.coerce.number().int().min(100).max(599).optional(),
   // Accepts ISO datetimes and `datetime-local` values (interpreted in the
   // server timezone, UTC in production).
   from: dateFilter.optional(),

@@ -30,21 +30,33 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
   const params = await searchParams
   const result = await listApplicationLogs(user.id, params)
 
-  const items: LogExplorerItem[] = result.items.map((row) => ({
-    id: row.id,
-    createdAt: row.createdAt.toISOString(),
-    level: row.level,
-    event: row.event,
-    message: row.message,
-    requestId: row.requestId,
-    transactionId: row.transactionId,
-    metadata: (row.metadata as Record<string, unknown> | null) ?? null,
-  }))
+  const items: LogExplorerItem[] = result.items.map((row) => {
+    const metadata = (row.metadata as Record<string, unknown> | null) ?? null
+    return {
+      id: row.id,
+      createdAt: row.createdAt.toISOString(),
+      level: row.level,
+      event: row.event,
+      message: row.message,
+      requestId: row.requestId,
+      transactionId: row.transactionId,
+      // Request attributes recorded in metadata by the API wrapper.
+      method: typeof metadata?.method === "string" ? metadata.method : null,
+      path: typeof metadata?.path === "string" ? metadata.path : null,
+      statusCode:
+        typeof metadata?.statusCode === "number" ? metadata.statusCode : null,
+      durationMs:
+        typeof metadata?.durationMs === "number" ? metadata.durationMs : null,
+      metadata,
+    }
+  })
 
   const filters: LogExplorerFilters = {
     level: pick(params, "level") ?? "",
     event: pick(params, "event") ?? "",
     requestId: pick(params, "requestId") ?? "",
+    path: pick(params, "path") ?? "",
+    statusCode: pick(params, "statusCode") ?? "",
     from: pick(params, "from") ?? "",
     to: pick(params, "to") ?? "",
   }
