@@ -1,0 +1,69 @@
+import type { Metadata } from "next"
+import { requireUser } from "@/infrastructure/auth/session"
+import { listApplicationLogs } from "@/domain/log/service"
+import { LogExplorer, type LogExplorerItem, type LogExplorerFilters } from "./log-explorer"
+
+export const metadata: Metadata = { title: "Logs" }
+
+/*
+  /logs — per-user application log explorer.
+
+  Reads are scoped by the authenticated session's user id inside
+  listApplicationLogs; a user can never see another user's logs. Events
+  emitted before authentication (userId null) are only visible in Axiom.
+*/
+
+interface LogsPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
+function pick(
+  params: Record<string, string | string[] | undefined>,
+  key: string,
+): string | undefined {
+  const value = params[key]
+  return typeof value === "string" && value !== "" ? value : undefined
+}
+
+export default async function LogsPage({ searchParams }: LogsPageProps) {
+  const { user } = await requireUser()
+  const params = await searchParams
+  const result = await listApplicationLogs(user.id, params)
+
+  const items: LogExplorerItem[] = result.items.map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    level: row.level,
+    event: row.event,
+    message: row.message,
+    requestId: row.requestId,
+    transactionId: row.transactionId,
+    metadata: (row.metadata as Record<string, unknown> | null) ?? null,
+  }))
+
+  const filters: LogExplorerFilters = {
+    level: pick(params, "level") ?? "",
+    event: pick(params, "event") ?? "",
+    requestId: pick(params, "requestId") ?? "",
+    from: pick(params, "from") ?? "",
+    to: pick(params, "to") ?? "",
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Logs</h1>
+        <p className="text-sm text-muted-foreground">
+          Application events from your ingestion pipeline, newest first.
+          Correlate an operation with its request id.
+        </p>
+      </div>
+      <LogExplorer
+        items={items}
+        filters={filters}
+        page={result.page}
+        hasMore={result.hasMore}
+      />
+    </div>
+  )
+}

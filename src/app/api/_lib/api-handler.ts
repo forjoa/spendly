@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { log, runWithLogContext, newRequestId, type LogContext } from "@/lib/logger"
 import { ensureAxiomSink, flushAxiom } from "@/infrastructure/observability/axiom-sink"
+import { ensureDbSink, flushDbLogs } from "@/infrastructure/observability/db-sink"
 
 /**
  * Request lifecycle wrapper for the public API.
@@ -44,6 +45,7 @@ async function resolveRequestId(): Promise<string> {
 export function withApiLogging(handler: ApiHandler): ApiHandler {
   return async (request: Request): Promise<NextResponse> => {
     ensureAxiomSink()
+    ensureDbSink()
 
     const requestId = await resolveRequestId()
     const context: LogContext = {
@@ -89,9 +91,11 @@ export function withApiLogging(handler: ApiHandler): ApiHandler {
         statusCode: response.status,
         durationMs,
       })
-      // Ship logs to Axiom (no-op when unconfigured). Must run inside the
-      // request context so late events keep the requestId.
+      // Ship logs to Axiom and persist them to PostgreSQL (both no-op when
+      // unconfigured). Must run inside the request context so late events
+      // keep the requestId. Both flushes are fail-safe and never throw.
       await flushAxiom()
+      await flushDbLogs()
 
       return response
     })

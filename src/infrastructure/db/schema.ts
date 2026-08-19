@@ -7,6 +7,7 @@ import {
   boolean,
   uniqueIndex,
   index,
+  jsonb,
   pgEnum,
 } from "drizzle-orm/pg-core"
 
@@ -43,6 +44,8 @@ export const connectionProviderEnum = pgEnum("connection_provider", [
   "webhook",
   "custom_api",
 ])
+
+export const logLevelEnum = pgEnum("log_level", ["info", "warn", "error"])
 
 // ── Better Auth tables ─────────────────────────────────────────────────
 // These tables are owned by Spendly in the public schema and mirror Better
@@ -222,6 +225,33 @@ export const transactionDeliveries = pgTable(
   ],
 )
 
+// ── application logs ──────────────────────────────────────────────────
+
+export const applicationLogs = pgTable(
+  "application_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Null for events emitted before authentication (e.g. auth failures).
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    requestId: text("request_id"),
+    // Deliberately NOT a foreign key: a log insert must never fail because
+    // the referenced transaction row does not exist (yet). Correlation only.
+    transactionId: uuid("transaction_id"),
+    level: logLevelEnum("level").notNull(),
+    event: text("event").notNull(),
+    message: text("message"),
+    // Structured payload, already redacted by the logger before persistence.
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("application_log_user_created_idx").on(t.userId, t.createdAt),
+    index("application_log_request_idx").on(t.requestId),
+    index("application_log_transaction_idx").on(t.transactionId),
+    index("application_log_event_idx").on(t.userId, t.event),
+  ],
+)
+
 // ── types ──────────────────────────────────────────────────────────────
 
 export type User = typeof user.$inferSelect
@@ -232,8 +262,10 @@ export type Connection = typeof connections.$inferSelect
 export type ApiKey = typeof apiKeys.$inferSelect
 export type Transaction = typeof transactions.$inferSelect
 export type TransactionDelivery = typeof transactionDeliveries.$inferSelect
+export type ApplicationLog = typeof applicationLogs.$inferSelect
 
 export type NewConnection = typeof connections.$inferInsert
 export type NewApiKey = typeof apiKeys.$inferInsert
 export type NewTransaction = typeof transactions.$inferInsert
 export type NewTransactionDelivery = typeof transactionDeliveries.$inferInsert
+export type NewApplicationLog = typeof applicationLogs.$inferInsert

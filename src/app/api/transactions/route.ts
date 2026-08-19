@@ -7,7 +7,7 @@ import {
   transactionInputArraySchema,
   type TransactionInput,
 } from "@/domain/transaction/schema"
-import { log } from "@/lib/logger"
+import { log, attachLogContext } from "@/lib/logger"
 import { errorResponse, json } from "../_lib/errors"
 import { withApiLogging } from "../_lib/api-handler"
 import { summarizeBody } from "../_lib/body-inspect"
@@ -49,6 +49,10 @@ export const POST = withApiLogging(async (request: Request): Promise<NextRespons
 
   try {
     const { userId } = await authenticateApiKey()
+    // From here on, every event in this request carries userId, so the /logs
+    // view can reconstruct the operation (requestId + userId + transactionId).
+    // Events emitted before this point keep userId = null by design.
+    attachLogContext({ userId })
 
     const isArray = Array.isArray(body)
     const schema = isArray ? transactionInputArraySchema : transactionInputSchema
@@ -115,6 +119,7 @@ export const POST = withApiLogging(async (request: Request): Promise<NextRespons
 export const GET = withApiLogging(async (request: Request): Promise<NextResponse> => {
   try {
     const { userId } = await authenticateApiKey()
+    attachLogContext({ userId })
     const url = new URL(request.url)
     const limitParam = url.searchParams.get("limit")
     const limit = limitParam ? Number.parseInt(limitParam, 10) : 50

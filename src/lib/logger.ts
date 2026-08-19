@@ -197,6 +197,16 @@ export function getLogContext(): LogContext | undefined {
   return requestContext.getStore()
 }
 
+/**
+ * Merge fields into the active request's log context so every subsequent
+ * event inherits them (e.g. `userId` after authentication succeeds). No-op
+ * outside a `runWithLogContext` scope.
+ */
+export function attachLogContext(fields: Record<string, unknown>): void {
+  const store = requestContext.getStore()
+  if (store) Object.assign(store, fields)
+}
+
 /** Generate a fresh request id (crypto-strong). */
 export function newRequestId(): string {
   return webcrypto.randomUUID()

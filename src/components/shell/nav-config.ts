@@ -3,6 +3,7 @@ import {
   Receipt,
   Plug,
   KeyRound,
+  ScrollText,
   Settings,
   type LucideIcon,
 } from "lucide-react"
@@ -20,5 +21,6 @@ export const navItems: NavItem[] = [
   { title: "Transactions", href: "/transactions", icon: Receipt },
   { title: "Connections", href: "/connections", icon: Plug },
   { title: "API keys", href: "/api-keys", icon: KeyRound },
+  { title: "Logs", href: "/logs", icon: ScrollText },
   { title: "Settings", href: "/settings", icon: Settings, secondary: true },
 ]

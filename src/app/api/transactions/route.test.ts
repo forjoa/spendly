@@ -67,6 +67,9 @@ const {
 const { _resetAxiomSinkForTests } = await import(
   "@/infrastructure/observability/axiom-sink"
 )
+const { _resetDbSinkForTests } = await import(
+  "@/infrastructure/observability/db-sink"
+)
 
 function makeRequest(body: unknown): Request {
   return new Request("https://spendly.test/api/transactions", {
@@ -107,12 +110,14 @@ beforeEach(() => {
     replay: false,
   })
   _resetAxiomSinkForTests()
+  _resetDbSinkForTests()
   clearSinks()
   capture = captureEvents()
 })
 
 afterEach(() => {
   capture.stop()
+  _resetDbSinkForTests()
   clearSinks()
 })
 
@@ -167,6 +172,11 @@ describe("POST /api/transactions — happy path", () => {
     expect(JSON.stringify(parsed)).not.toContain("Coffee Shop")
     // Completion carries the status code.
     expect(byEvent.get("transaction.request.completed")!.statusCode).toBe(201)
+    // Events emitted after authentication carry the userId via the log
+    // context (needed for per-user scoping in the /logs view).
+    expect(byEvent.get("transaction.persisted")!.userId).toBe("user-1")
+    // Pre-auth events have no userId (the db sink backfills it at flush time).
+    expect(byEvent.get("transaction.request.received")!.userId).toBeUndefined()
   })
 
   it("returns 200 on idempotent replay", async () => {

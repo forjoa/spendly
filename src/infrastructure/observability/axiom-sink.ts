@@ -5,7 +5,7 @@ import { registerSink, type LogEvent, type LogContext, getLogContext } from "@/l
  * Axiom log sink (server-only).
  *
  * Sends structured events to Axiom via the official REST ingest endpoint:
- *   POST {AXIOM_URL}/v1/datasets/{AXIOM_DATASET}/_ingest
+ *   POST {AXIOM_URL}/v1/datasets/{AXIOM_DATASET}/ingest
  *   Authorization: Bearer {AXIOM_TOKEN}
  *   Content-Type: application/x-ndjson
  *
@@ -119,7 +119,7 @@ async function sendInBatches(config: AxiomConfig, events: LogEvent[]): Promise<v
 }
 
 async function sendOneBatch(config: AxiomConfig, events: LogEvent[]): Promise<void> {
-  const url = `${config.url}${INGEST_PATH}/${encodeURIComponent(config.dataset)}/_ingest`
+  const url = `${config.url}${INGEST_PATH}/${encodeURIComponent(config.dataset)}/ingest`
   // Axiom accepts NDJSON (one JSON object per line).
   const body = events.map((e) => JSON.stringify(e)).join("\n")
 

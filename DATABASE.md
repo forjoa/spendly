@@ -95,6 +95,27 @@ updatedAt
 
 Purpose: guarantee that the same external transaction never produces multiple Notion pages. A `delivered` row short-circuits re-delivery on an idempotent replay. This table lets us add more destinations later without changing the `Transaction` model.
 
+### ApplicationLog
+
+Structured application log events persisted by the logger's PostgreSQL sink (`src/infrastructure/observability/db-sink.ts`). Powers the authenticated `/logs` view.
+
+```text
+id
+userId          -- nullable; null for events emitted before authentication
+requestId       -- nullable; correlates all events of one request
+transactionId   -- nullable uuid; correlation only, deliberately NO foreign key
+level           -- info | warn | error
+event           -- e.g. "transaction.validation.failed"
+message         -- nullable
+metadata        -- jsonb, nullable; already redacted by the logger
+createdAt
+```
+
+Rules:
+- Every read is scoped by `userId`; a user can never see another user's logs.
+- Events are written already redacted (the logger's redaction pass runs before sinks), so no API keys, tokens, or credentials are ever persisted.
+- `transactionId` has no FK on purpose: a log insert must never fail because the referenced transaction row does not exist.
+
 ## Relationships
 
 ```text
@@ -103,7 +124,8 @@ User
  │    └── TransactionDeliveries
  ├── Connections
  ├── Destinations
- └── ApiKeys
+ ├── ApiKeys
+ └── ApplicationLogs
 ```
 
 ## Principles

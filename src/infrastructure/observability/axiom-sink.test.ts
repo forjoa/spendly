@@ -77,7 +77,7 @@ describe("Axiom sink flush", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe(`${URL}/v1/datasets/${DATASET}/_ingest`)
+    expect(url).toBe(`${URL}/v1/datasets/${DATASET}/ingest`)
     expect(init.method).toBe("POST")
     expect((init.headers as Record<string, string>).Authorization).toBe(
       `Bearer ${TOKEN}`,
