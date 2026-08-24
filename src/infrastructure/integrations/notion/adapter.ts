@@ -2,7 +2,7 @@ import "server-only"
 import { DestinationError } from "@/lib/errors"
 import { log } from "@/lib/logger"
 import type { Transaction } from "@/infrastructure/db/schema"
-import { formatMinorUnits } from "@/lib/money"
+import { formatMinorUnits, minorToMajor } from "@/lib/money"
 
 /*
   Notion destination adapter.
@@ -319,12 +319,10 @@ function buildProperties(
     tx.merchant,
   )
 
-  // Amount — documented as text/rich_text, formatted as a currency string.
+  // Amount — numeric when the database property is a number, otherwise a
+  // formatted currency string for text-like properties.
   const amount = resolved.get("Amount")!
-  properties[amount.name] = mapText(
-    amount,
-    formatMinorUnits(tx.amountMinor, tx.currency),
-  )
+  properties[amount.name] = mapAmount(amount, tx)
 
   // Currency — documented as select.
   properties[resolved.get("Currency")!.name] = mapSelect(
@@ -363,6 +361,19 @@ function buildProperties(
   }
 
   return properties
+}
+
+/**
+ * Map the transaction amount to the property type. A Notion number property
+ * must receive the numeric major-unit value (e.g. 5.99 for 599 cents) —
+ * sending the formatted string ("€5.99") makes Notion store NaN and the
+ * property renders empty. Text-like properties get the formatted string.
+ */
+function mapAmount(prop: NotionProperty, tx: Transaction): unknown {
+  if (prop.type === "number") {
+    return { number: minorToMajor(tx.amountMinor, tx.currency) }
+  }
+  return mapText(prop, formatMinorUnits(tx.amountMinor, tx.currency))
 }
 
 /** Map a text value to the property type, adapting where safe. */

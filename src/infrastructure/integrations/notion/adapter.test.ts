@@ -43,6 +43,7 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
     account: null,
     paymentMethod: null,
     externalId: "wallet-2026-08-12-10-30",
+    recurringRuleId: null,
     createdAt: new Date("2026-08-12T10:30:00.000Z"),
     updatedAt: new Date("2026-08-12T10:30:00.000Z"),
     ...overrides,
@@ -241,9 +242,32 @@ describe("deliverToNotion", () => {
           typeof c[0] === "string" && (c[0] as string).endsWith("/pages"),
       )
       const body = JSON.parse((pageCall![1] as RequestInit).body as string)
-      // Amount is sent as { number: <value> }, not { rich_text: [...] }.
-      expect(body.properties.Amount).toHaveProperty("number")
+      // Amount is sent as { number: <major units> }, not { rich_text: [...] }.
+      // 599 cents of EUR must arrive as the number 5.99 — sending the
+      // formatted string ("€5.99") made Notion store NaN and render the
+      // property empty.
+      expect(body.properties.Amount).toEqual({ number: 5.99 })
       expect(body.properties.Amount).not.toHaveProperty("rich_text")
+    })
+
+    it("sends integer major units for zero-decimal currencies", async () => {
+      const schema = documentedSchema()
+      schema["Amount"] = { type: "number" }
+      fetchMock = mockFetch({ schemaBody: { properties: schema } })
+      vi.stubGlobal("fetch", fetchMock)
+
+      await deliverToNotion({
+        token: TOKEN,
+        databaseId: DATABASE_ID,
+        transaction: makeTransaction({ amountMinor: 1500, currency: "JPY" }),
+      })
+
+      const pageCall = fetchMock.mock.calls.find(
+        (c) =>
+          typeof c[0] === "string" && (c[0] as string).endsWith("/pages"),
+      )
+      const body = JSON.parse((pageCall![1] as RequestInit).body as string)
+      expect(body.properties.Amount).toEqual({ number: 1500 })
     })
 
     it("adapts when Currency is multi_select instead of select", async () => {

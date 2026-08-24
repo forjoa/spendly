@@ -9,7 +9,8 @@ import * as deliveryRepo from "./delivery-repository"
 import { connectionRepo } from "@/domain/connection/repository"
 import { decryptCredential, type NotionCredential } from "@/domain/connection/credentials"
 import { deliverToNotion } from "@/infrastructure/integrations/notion/adapter"
-import type { TransactionInput } from "./schema"
+import { manualTransactionInputSchema, type TransactionInput } from "./schema"
+import { summarizeTransactions, type PeriodSummary } from "./summary"
 
 /*
   Transaction service — the heart of the Source → Transaction → Processing →
@@ -40,9 +41,19 @@ export interface DeliveryOutcome {
   error?: string
 }
 
+export interface IngestOptions {
+  /**
+   * When true, a destination failure is recorded on the delivery row and
+   * reported in the result instead of throwing. Used for manual entries,
+   * where the persisted transaction is the primary outcome.
+   */
+  tolerateDeliveryFailure?: boolean
+}
+
 export async function ingest(
   userId: string,
   input: TransactionInput,
+  options: IngestOptions = {},
 ): Promise<IngestResult> {
   // 1. Idempotent lookup.
   const existing = await txRepo.findByExternalId(userId, input.externalId)
@@ -67,9 +78,54 @@ export async function ingest(
   })
 
   // 3. Deliver to enabled destinations (V0: Notion).
-  const deliveries = await deliverToDestinations(userId, transaction)
+  try {
+    const deliveries = await deliverToDestinations(userId, transaction)
+    return { transaction, deliveries, replay: false }
+  } catch (err) {
+    if (options.tolerateDeliveryFailure && err instanceof DestinationError) {
+      return {
+        transaction,
+        deliveries: [
+          { provider: "notion", status: "failed", error: err.message },
+        ],
+        replay: false,
+      }
+    }
+    throw err
+  }
+}
 
-  return { transaction, deliveries, replay: false }
+/** Source value for one-off transactions entered by hand in the app. */
+export const MANUAL_SOURCE = "manual"
+
+/**
+ * Persist a one-off transaction entered by hand (manual income or expense).
+ * Reuses the ingestion pipeline — including destination delivery — with a
+ * generated idempotency key, so manual entries behave exactly like synced
+ * ones. Delivery failures never lose the transaction.
+ */
+export async function recordManualTransaction(
+  userId: string,
+  rawInput: unknown,
+): Promise<IngestResult> {
+  const parsed = manualTransactionInputSchema.safeParse(rawInput)
+  if (!parsed.success) {
+    throw new ValidationError(
+      parsed.error.issues[0]?.message ?? "Invalid transaction",
+    )
+  }
+  return ingest(
+    userId,
+    {
+      ...parsed.data,
+      subcategory: null,
+      source: MANUAL_SOURCE,
+      account: null,
+      paymentMethod: null,
+      externalId: `manual:${crypto.randomUUID()}`,
+    },
+    { tolerateDeliveryFailure: true },
+  )
 }
 
 async function deliverToDestinations(
@@ -161,18 +217,20 @@ function sanitize(message: string): string {
 export async function listTransactions(
   userId: string,
   limit = 50,
+  filter: txRepo.TransactionFilter = {},
 ): Promise<Transaction[]> {
-  if (limit < 1 || limit > 100) {
-    throw new ValidationError("limit must be between 1 and 100")
+  if (limit < 1 || limit > 200) {
+    throw new ValidationError("limit must be between 1 and 200")
   }
-  return txRepo.listByUser(userId, limit)
+  return txRepo.listByUser(userId, limit, filter)
 }
 
 export async function listTransactionsWithDeliveries(
   userId: string,
   limit = 50,
+  filter: txRepo.TransactionFilter = {},
 ): Promise<{ transaction: Transaction; deliveries: TransactionDeliveryRow[] }[]> {
-  const transactions = await listTransactions(userId, limit)
+  const transactions = await listTransactions(userId, limit, filter)
   if (transactions.length === 0) return []
   const ids = transactions.map((t) => t.id)
   const deliveries = await db
@@ -196,6 +254,26 @@ export async function getTransaction(
   id: string,
 ): Promise<Transaction | undefined> {
   return txRepo.getById(userId, id)
+}
+
+/**
+ * Exact financial summary of a period from the single source of truth: the
+ * transaction table. Income, expenses and remaining are integer minor-unit
+ * sums; recurring rules contribute only through their generated
+ * transactions, so nothing is ever counted twice.
+ */
+export async function getPeriodSummary(
+  userId: string,
+  from: Date,
+  to: Date,
+): Promise<PeriodSummary> {
+  const transactions = await txRepo.listInPeriod(userId, from, to)
+  return summarizeTransactions(transactions)
+}
+
+/** Distinct categories used by the user's transactions (for filter UIs). */
+export async function listCategories(userId: string): Promise<string[]> {
+  return txRepo.listCategories(userId)
 }
 
 export async function getDeliveries(transactionId: string) {

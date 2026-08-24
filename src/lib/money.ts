@@ -50,6 +50,40 @@ export function normalizeCurrency(currency: string): string {
   return upper
 }
 
+/**
+ * Convert a major-unit value (string or number like "10.50" or 10.5) into
+ * integer minor units using the currency's exponent. Throws on invalid
+ * format or when there are more fractional digits than the currency allows —
+ * values are never rounded, truncated, or coerced through floats.
+ */
+export function majorToMinorUnits(
+  value: string | number,
+  currency: string,
+): number {
+  if (!currency) throw new Error("currency required to convert amount")
+  const exp = minorUnitExponent(currency)
+
+  const asString = typeof value === "number" ? value.toString() : (value ?? "").toString()
+  const s = asString.trim()
+  const match = s.match(/^([+-])?(\d+)(?:\.(\d+))?$/)
+  if (!match) throw new Error("invalid numeric format")
+
+  const sign = match[1] === "-" ? -1 : 1
+  const integerPart = match[2]
+  const fractionPart = match[3] ?? ""
+
+  if (fractionPart.length > exp) {
+    throw new Error(`too many decimal places for ${currency} (max ${exp})`)
+  }
+
+  const fracPadded = fractionPart.padEnd(exp, "0")
+  const combined = integerPart + fracPadded
+  const normalized = combined.replace(/^0+(?!$)/, "") || "0"
+  const minor = Number(normalized) * sign
+  if (!Number.isSafeInteger(minor)) throw new Error("amount out of safe integer range")
+  return minor
+}
+
 /** True when the value is a safe integer in the supported minor-unit range. */
 export function isValidMinorAmount(value: unknown): value is number {
   return (

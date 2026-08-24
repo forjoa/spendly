@@ -72,7 +72,7 @@ export const transactionInputSchema = z.preprocess((raw) => {
       try {
         const minor = majorToMinor(am as string | number, obj.currency as string);
         return { ...obj, amountMinor: minor };
-      } catch (e) {
+      } catch {
         return obj;
       }
     }
@@ -85,7 +85,7 @@ export const transactionInputSchema = z.preprocess((raw) => {
     try {
       const minor = majorToMinor(obj.amount as string | number, obj.currency as string);
       return { ...obj, amountMinor: minor };
-    } catch (e) {
+    } catch {
       return obj;
     }
   }

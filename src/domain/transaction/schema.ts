@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { normalizeCurrency, minorUnitExponent } from "@/lib/money"
+import { normalizeCurrency, majorToMinorUnits } from "@/lib/money"
 
 /*
   Transaction domain schemas (Zod).
@@ -23,45 +23,18 @@ export const transactionTypeSchema = z.enum([
  * number whose value is an exact safe integer (in JSON, 599 and 599.0 are
  * the same number) and guarantees the domain receives an integer.
  *
- * Fractional values (599.5, 5.99, 298.99999999999997) and strings ("599")
- * are rejected — never rounded, truncated, or coerced. Silently "fixing" an
- * amount would corrupt money. This applies to every source, not just
+ * Decimal representations (599.5, "5.99") reach this schema only after the
+ * preprocessing in {@link #transactionInputSchema} has converted them to
+ * minor units via the currency exponent; anything that cannot be converted
+ * exactly (e.g. 298.99999999999997, "abc") is left untouched and rejected
+ * here — never rounded, truncated, or coerced. Silently "fixing" an amount
+ * would corrupt money. This applies to every source, not just
  * Apple Shortcuts; source quirks stay at the boundary.
  */
 export const amountMinorSchema = z
   .number({ error: "amountMinor must be a JSON number; strings are not accepted" })
   .int({ error: "amountMinor must be an integer in minor units; fractional values are rejected, never rounded" })
   .finite({ error: "amountMinor must be finite" })
-
-/**
- * Convert a major-unit value (string or number like "10.50" or 10.5) into
- * minor units using the currency's exponent (from src/lib/money). Throws
- * on invalid format or if there are more fractional digits than allowed.
- */
-function majorToMinor(value: string | number, currency: string): number {
-  const exp = minorUnitExponent(currency)
-  if (!currency) throw new Error("currency required to convert amount")
-
-  const asString = typeof value === "number" ? value.toString() : (value ?? "").toString()
-  const s = asString.trim()
-  const match = s.match(/^([+-])?(\d+)(?:\.(\d+))?$/)
-  if (!match) throw new Error("invalid numeric format")
-
-  const sign = match[1] === "-" ? -1 : 1
-  const integerPart = match[2]
-  const fractionPart = match[3] ?? ""
-
-  if (fractionPart.length > exp) {
-    throw new Error(`too many decimal places for ${currency} (max ${exp})`)
-  }
-
-  const fracPadded = fractionPart.padEnd(exp, "0")
-  const combined = integerPart + fracPadded
-  const normalized = combined.replace(/^0+(?!$)/, "") || "0"
-  const minor = Number(normalized) * sign
-  if (!Number.isSafeInteger(minor)) throw new Error("amount out of safe integer range")
-  return minor
-}
 
 /**
  * The normalized transaction accepted by the Spendly API.
@@ -100,9 +73,9 @@ export const transactionInputSchema = z.preprocess((raw) => {
         return obj
       }
       try {
-        const minor = majorToMinor(am as string | number, obj.currency as string)
+        const minor = majorToMinorUnits(am as string | number, obj.currency as string)
         return { ...obj, amountMinor: minor }
-      } catch (e) {
+      } catch {
         return obj
       }
     }
@@ -113,9 +86,9 @@ export const transactionInputSchema = z.preprocess((raw) => {
   // If amount provided instead of amountMinor, try to convert using currency
   if (obj.amount !== undefined && typeof obj.currency === "string") {
     try {
-      const minor = majorToMinor(obj.amount as string | number, obj.currency as string)
+      const minor = majorToMinorUnits(obj.amount as string | number, obj.currency as string)
       return { ...obj, amountMinor: minor }
-    } catch (e) {
+    } catch {
       return obj
     }
   }
@@ -147,3 +120,44 @@ export const transactionInputArraySchema = z
   .max(50)
 
 export type TransactionInputArray = z.infer<typeof transactionInputArraySchema>
+
+/**
+ * A one-off transaction entered by hand in the app (source "manual").
+ * Amount crosses the boundary as a major-unit string ("50" or "32.40") and
+ * is converted to integer minor units — never rounded. Date is a calendar
+ * day (YYYY-MM-DD); it is stored at midday UTC so it renders on the intended
+ * day in every common time zone.
+ */
+export const manualTransactionInputSchema = z
+  .object({
+    merchant: z.string().trim().min(1, "Name is required").max(200),
+    amount: z.string().min(1, "Amount is required").max(30),
+    currency: z
+      .string()
+      .transform((v) => normalizeCurrency(v))
+      .refine((v) => /^[A-Z]{3}$/.test(v), "Invalid currency code"),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+    type: z.enum(["income", "expense"]),
+    category: z.string().trim().max(100).nullish(),
+  })
+  .superRefine((value, ctx) => {
+    try {
+      majorToMinorUnits(value.amount, value.currency)
+    } catch {
+      ctx.addIssue({
+        code: "custom",
+        message: "Amount is not a valid monetary value for this currency",
+        path: ["amount"],
+      })
+    }
+  })
+  .transform((value) => ({
+    merchant: value.merchant,
+    amountMinor: Math.abs(majorToMinorUnits(value.amount, value.currency)),
+    currency: value.currency,
+    date: `${value.date}T12:00:00.000Z`,
+    type: value.type,
+    category: value.category || null,
+  }))
+
+export type ManualTransactionInput = z.infer<typeof manualTransactionInputSchema>

@@ -35,12 +35,14 @@ describe("transactionInputSchema", () => {
     expect(() => transactionInputSchema.parse({ ...validInput, currency: "US" })).toThrow()
   })
 
-  it("rejects a non-integer amount", () => {
+  it("interprets a non-integer amount as major units and converts it", () => {
+    // 4.5 USD = 450 cents; conversion is exact, never rounded.
     const result = transactionInputSchema.safeParse({
       ...validInput,
       amountMinor: 4.5,
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
+    expect(result.data!.amountMinor).toBe(450)
   })
 
   it("rejects a non-finite amount (NaN)", () => {
@@ -71,17 +73,22 @@ describe("transactionInputSchema", () => {
       expect(Number.isSafeInteger(result.amountMinor)).toBe(true)
     })
 
-    it.each([599.5, 99.99])(
-      "rejects fractional number %s without rounding or truncating",
-      (amount) => {
+    it.each([
+      [599.5, 59950],
+      [99.99, 9999],
+    ])(
+      "interprets fractional number %s as major units and converts it to %i minor units",
+      (amount, expectedMinor) => {
         const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: amount })
-        expect(result.success).toBe(false)
+        expect(result.success).toBe(true)
+        expect(result.data!.amountMinor).toBe(expectedMinor)
       },
     )
 
-    it("rejects 5.99 (major units) instead of silently converting", () => {
+    it("interprets 5.99 (major units) as 599 minor units", () => {
       const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: 5.99 })
-      expect(result.success).toBe(false)
+      expect(result.success).toBe(true)
+      expect(result.data!.amountMinor).toBe(599)
     })
 
     it("rejects a floating-point artifact such as 19.99 * 100", () => {
@@ -97,8 +104,17 @@ describe("transactionInputSchema", () => {
       expect(result.success).toBe(false)
     })
 
-    it.each(["599", "99.99", "abc"])("rejects string %s", (amount) => {
+    it.each([
+      ["599", 599],
+      ["99.99", 9999],
+    ])("coerces numeric string %s to %i minor units", (amount, expectedMinor) => {
       const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: amount })
+      expect(result.success).toBe(true)
+      expect(result.data!.amountMinor).toBe(expectedMinor)
+    })
+
+    it("rejects non-numeric strings", () => {
+      const result = transactionInputSchema.safeParse({ ...validInput, amountMinor: "abc" })
       expect(result.success).toBe(false)
     })
 

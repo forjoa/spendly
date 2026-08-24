@@ -127,3 +127,13 @@ Not yet implemented (intentional, per V0 scope):
 - Axiom dataset + token must be created manually and set as Vercel env vars (`AXIOM_DATASET`, `AXIOM_TOKEN`) for production log retention; without them the sink is a no-op and logs go to console only.
 
 Checks (all green as of this writing): `npm run typecheck`, `npm run build` (13 routes including `/logs` and `/docs/apple-wallet-shortcut`), `npm run lint` (0 warnings), `npm test` (181 passed: money 19, crypto 7, keys 11, transaction schema 35 (including the `amountMinor` boundary contract: integer-valued JSON numbers accepted, fractional numbers rejected without rounding), error mapper 7, logger 13, body-inspect 6, axiom-sink 11, db-sink 13, log service 12, route observability 11, api-key auth 6, plus existing notion/crypto tests).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

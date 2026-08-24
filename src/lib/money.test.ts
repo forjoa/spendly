@@ -3,6 +3,7 @@ import {
   formatMinorUnits,
   formatSignedMinorUnits,
   isValidMinorAmount,
+  majorToMinorUnits,
   minorToMajor,
   minorUnitExponent,
   normalizeCurrency,
@@ -101,5 +102,32 @@ describe("formatSignedMinorUnits", () => {
   })
   it("does not prefix positive amounts", () => {
     expect(formatSignedMinorUnits(1050, "EUR", "en-US")).not.toMatch(/^-/)
+  })
+})
+
+describe("majorToMinorUnits", () => {
+  it("converts major units to minor units for 2-decimal currencies", () => {
+    expect(majorToMinorUnits("10.50", "EUR")).toBe(1050)
+    expect(majorToMinorUnits(10.5, "EUR")).toBe(1050)
+    expect(majorToMinorUnits("2400", "EUR")).toBe(240000)
+    expect(majorToMinorUnits("0.01", "EUR")).toBe(1)
+  })
+
+  it("converts without decimals for 0-decimal currencies", () => {
+    expect(majorToMinorUnits("1500", "JPY")).toBe(1500)
+  })
+
+  it("converts with three decimals for 3-decimal currencies", () => {
+    expect(majorToMinorUnits("10.500", "BHD")).toBe(10500)
+  })
+
+  it("rejects values with too many decimal places", () => {
+    expect(() => majorToMinorUnits("10.505", "EUR")).toThrow()
+    expect(() => majorToMinorUnits("1.5", "JPY")).toThrow()
+  })
+
+  it("rejects invalid numeric formats", () => {
+    expect(() => majorToMinorUnits("abc", "EUR")).toThrow()
+    expect(() => majorToMinorUnits("", "EUR")).toThrow()
   })
 })

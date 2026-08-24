@@ -112,6 +112,7 @@ beforeEach(() => {
       account: null,
       paymentMethod: null,
       externalId: "wallet-2026-08-12-10-30",
+      recurringRuleId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -204,6 +205,7 @@ describe("POST /api/transactions — happy path", () => {
         account: null,
         paymentMethod: null,
         externalId: "wallet-2026-08-12-10-30",
+        recurringRuleId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -218,9 +220,10 @@ describe("POST /api/transactions — happy path", () => {
 
 describe("POST /api/transactions — validation failure (the 422 case)", () => {
   it("returns 422 for an invalid body and logs full Zod issues", async () => {
-    // amountMinor as a string is the kind of shape mismatch a real Apple
-    // Wallet payload might produce and that we must be able to diagnose.
-    const badBody = { ...VALID_BODY, amountMinor: "599" }
+    // amountMinor as a non-numeric string is the kind of shape mismatch a
+    // real Apple Wallet payload might produce and that we must be able to
+    // diagnose. (Numeric strings like "599" are coerced and accepted.)
+    const badBody = { ...VALID_BODY, amountMinor: "599x" }
     const res = await POST(makeRequest(badBody))
     expect(res.status).toBe(422)
 
@@ -369,7 +372,7 @@ describe("POST /api/transactions — PostgreSQL persistence before the response"
 
   it("persists a 422 with its validation issues", async () => {
     process.env.DATABASE_URL = DATABASE_URL
-    const res = await POST(makeRequest({ ...VALID_BODY, amountMinor: "599" }))
+    const res = await POST(makeRequest({ ...VALID_BODY, amountMinor: "599x" }))
     expect(res.status).toBe(422)
 
     const records = vi.mocked(recordApplicationLogs).mock.calls[0]![0] as Array<
