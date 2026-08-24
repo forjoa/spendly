@@ -178,6 +178,15 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Normalize date/time input sizing to match regular inputs */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"] {
+    padding: 0.25rem;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
