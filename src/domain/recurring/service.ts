@@ -126,6 +126,43 @@ export async function createRule(
   })
 }
 
+/**
+ * Recompute nextRunDate when a rule's schedule or start date is edited.
+ *
+ * Anchoring on the *old* nextRunDate via nextOccurrence (as this used to
+ * do) is wrong: nextOccurrence always returns something strictly after
+ * its anchor, so re-editing a rule that hasn't fired yet keeps stepping
+ * the date one more period forward on every save — Sep 1 → Oct 1 → Nov 1
+ * → ... on repeated edits — instead of landing on what was actually
+ * typed. (Reported: editing a fresh rule's start date back and forth
+ * between Aug 1 and Sep 1 drifted forward by a month on every edit.)
+ *
+ * The correct floor depends on whether anything has materialized yet:
+ * - Nothing generated yet (nextRunDate is still exactly where the rule's
+ *   own schedule would first put it): free to recompute purely from the
+ *   new start date, the same as creating a fresh rule.
+ * - Something already generated (nextRunDate has advanced past that
+ *   point): never move the floor earlier than it, or the next
+ *   materialization pass inserts a *second*, differently-dated
+ *   occurrence for a period already recorded — a real duplicate that the
+ *   (userId, externalId) unique index does not catch, because the date
+ *   itself (and so the externalId) differs.
+ */
+function recomputeNextRunDate(
+  existing: RecurringRule,
+  newSpec: RecurrenceSpec,
+  newStartDate: Date,
+): Date {
+  const oldInitial = initialRunDate(specOf(existing), existing.startDate)
+  const hasMaterialized = existing.nextRunDate.getTime() > oldInitial.getTime()
+  const floor = !hasMaterialized
+    ? newStartDate
+    : newStartDate.getTime() > existing.nextRunDate.getTime()
+      ? newStartDate
+      : existing.nextRunDate
+  return initialRunDate(newSpec, floor)
+}
+
 export async function updateRule(
   userId: string,
   id: string,
@@ -143,9 +180,8 @@ export async function updateRule(
   const input = parsed.data
   const startDate = new Date(`${input.startDate}T00:00:00.000Z`)
 
-  // When the schedule or amount changes, future occurrences must follow the
-  // new configuration. Recompute the next run from the last materialized
-  // occurrence so already-generated history is untouched.
+  // When the schedule or start date changes, future occurrences must
+  // follow the new configuration.
   const scheduleChanged =
     input.frequency !== existing.frequency ||
     input.dayOfMonth !== existing.dayOfMonth ||
@@ -153,9 +189,10 @@ export async function updateRule(
     startDate.getTime() !== existing.startDate.getTime()
 
   const nextRunDate = scheduleChanged
-    ? nextOccurrence(
+    ? recomputeNextRunDate(
+        existing,
         { frequency: input.frequency, dayOfMonth: input.dayOfMonth, monthOfYear: input.monthOfYear },
-        existing.nextRunDate,
+        startDate,
       )
     : existing.nextRunDate
 
