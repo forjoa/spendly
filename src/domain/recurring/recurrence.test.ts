@@ -26,9 +26,54 @@ describe("occurrenceKey", () => {
 })
 
 describe("initialRunDate", () => {
-  it("is the start date at UTC midnight", () => {
-    expect(initialRunDate(new Date("2026-08-25T10:00:00.000Z")).toISOString()).toBe(
+  it("weekly: is the start date at UTC midnight — any weekday is a valid first occurrence", () => {
+    const spec = { frequency: "weekly" as const }
+    expect(
+      initialRunDate(spec, new Date("2026-08-25T10:00:00.000Z")).toISOString(),
+    ).toBe("2026-08-25T00:00:00.000Z")
+  })
+
+  it("monthly: uses the start date itself when it already lands on the configured day", () => {
+    const spec = { frequency: "monthly" as const, dayOfMonth: 4 }
+    expect(initialRunDate(spec, d("2026-08-04")).toISOString()).toBe(
+      "2026-08-04T00:00:00.000Z",
+    )
+  })
+
+  it("monthly: rolls forward to next month when the start date is past the configured day — a rule meant to start next month must not pay out on the creation day", () => {
+    // Reproduces the real bug: a "day 1" salary rule created on the 24th
+    // must first fire on the 1st of the *following* month, never the 24th.
+    const spec = { frequency: "monthly" as const, dayOfMonth: 1 }
+    expect(initialRunDate(spec, d("2026-08-24")).toISOString()).toBe(
+      "2026-09-01T00:00:00.000Z",
+    )
+  })
+
+  it("monthly: rolls forward within the same month when the configured day is still ahead", () => {
+    const spec = { frequency: "monthly" as const, dayOfMonth: 25 }
+    expect(initialRunDate(spec, d("2026-08-10")).toISOString()).toBe(
       "2026-08-25T00:00:00.000Z",
+    )
+  })
+
+  it("monthly: clamps to the last day of a shorter month", () => {
+    const spec = { frequency: "monthly" as const, dayOfMonth: 31 }
+    expect(initialRunDate(spec, d("2026-02-01")).toISOString()).toBe(
+      "2026-02-28T00:00:00.000Z",
+    )
+  })
+
+  it("yearly: uses the start date when it already matches month and day", () => {
+    const spec = { frequency: "yearly" as const, monthOfYear: 4, dayOfMonth: 10 }
+    expect(initialRunDate(spec, d("2026-04-10")).toISOString()).toBe(
+      "2026-04-10T00:00:00.000Z",
+    )
+  })
+
+  it("yearly: rolls forward to next year when the configured date has already passed this year", () => {
+    const spec = { frequency: "yearly" as const, monthOfYear: 4, dayOfMonth: 10 }
+    expect(initialRunDate(spec, d("2026-08-24")).toISOString()).toBe(
+      "2027-04-10T00:00:00.000Z",
     )
   })
 })

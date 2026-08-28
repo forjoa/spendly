@@ -118,7 +118,10 @@ export async function createRule(
     dayOfMonth: input.dayOfMonth,
     monthOfYear: input.monthOfYear,
     startDate,
-    nextRunDate: initialRunDate(startDate),
+    nextRunDate: initialRunDate(
+      { frequency: input.frequency, dayOfMonth: input.dayOfMonth, monthOfYear: input.monthOfYear },
+      startDate,
+    ),
     active: true,
   })
 }

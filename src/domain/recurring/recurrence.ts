@@ -101,11 +101,30 @@ export function nextOccurrence(spec: RecurrenceSpec, after: Date): Date {
 }
 
 /**
- * The date a rule should run next given it has never run: its start date,
- * normalized to UTC midnight.
+ * The date a rule should run next given it has never run: the first
+ * occurrence of its schedule on or after `startDate`.
+ *
+ * For monthly/yearly rules this must roll forward to the configured
+ * day/month when the start date does not already land on one — a monthly
+ * "day 1" rule started on the 24th first fires the *following* month's
+ * 1st, not the 24th. `nextOccurrence` already applies this clamping to
+ * every later occurrence; without the same rule here, creating a rule
+ * mid-month immediately materializes an unintended payment dated the
+ * creation day itself (e.g. a salary rule meant to start next month pays
+ * out today instead).
+ *
+ * Weekly rules have no day-of-week constraint, so the start date itself
+ * is always a valid first occurrence.
  */
-export function initialRunDate(startDate: Date): Date {
-  return utcDay(startDate)
+export function initialRunDate(spec: RecurrenceSpec, startDate: Date): Date {
+  const day = utcDay(startDate)
+  if (spec.frequency === "weekly") return day
+  // "The first occurrence on or after `day`" = "the first occurrence
+  // strictly after the day before `day`" — reuses nextOccurrence's
+  // clamping instead of duplicating it, and correctly returns `day`
+  // itself when it already matches the schedule.
+  const dayBefore = new Date(day.getTime() - 24 * 60 * 60 * 1000)
+  return nextOccurrence(spec, dayBefore)
 }
 
 /** Human-facing description of a schedule, e.g. "Monthly · day 25". */
