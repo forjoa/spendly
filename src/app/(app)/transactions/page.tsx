@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { StatusBadge, type DeliveryStatus } from "@/components/ui/status-badge"
 import { formatTransactionDate } from "@/lib/money"
+import { PageHeader } from "@/components/shell/page-header"
 import { AddTransactionDialog } from "../_components/add-transaction-dialog"
 
 export const metadata: Metadata = { title: "Transactions" }
@@ -112,15 +113,17 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
   if (rows.length === 0 && !filtersActive) {
     return (
       <div className="flex flex-col gap-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
-            <p className="text-sm text-muted-foreground">
-              Every movement Spendly knows about — synced, recurring or manual.
-            </p>
-          </div>
-          <AddTransactionDialog fixedType="expense" triggerLabel="Add expense" />
-        </div>
+        <PageHeader
+          title="Transactions"
+          description="Every movement Spendly knows about — synced, recurring or manual."
+          actions={
+            <AddTransactionDialog
+              fixedType="expense"
+              triggerLabel="Add expense"
+              triggerVariant="default"
+            />
+          }
+        />
         <EmptyState
           icon={<Receipt />}
           title="No transactions yet"
@@ -132,16 +135,17 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
-          <p className="text-sm text-muted-foreground">
-            Every movement Spendly knows about — synced, recurring or manual.
-            Newest first.
-          </p>
-        </div>
-        <AddTransactionDialog fixedType="expense" triggerLabel="Add expense" />
-      </div>
+      <PageHeader
+        title="Transactions"
+        description="Every movement Spendly knows about — synced, recurring or manual. Newest first."
+        actions={
+          <AddTransactionDialog
+            fixedType="expense"
+            triggerLabel="Add expense"
+            triggerVariant="default"
+          />
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -227,7 +231,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                 </thead>
                 <tbody>
                   {rows.map(({ transaction, deliveries }) => (
-                    <tr key={transaction.id} className="border-b last:border-0">
+                    <tr key={transaction.id} className="border-b transition-colors last:border-0 hover:bg-muted/40">
                       <td className="px-6 py-3">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-medium">{transaction.merchant}</span>

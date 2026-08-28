@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Check, Clock, AlertTriangle } from "lucide-react"
+import { Check, Clock, AlertTriangle, MinusCircle } from "lucide-react"
 import { Badge, type BadgeProps } from "./badge"
 import { cn } from "@/lib/utils"
 
@@ -20,7 +20,7 @@ const STATUS_CONFIG: Record<
   pending: { label: "Pending", variant: "warning", icon: <Clock /> },
   delivered: { label: "Delivered", variant: "success", icon: <Check /> },
   failed: { label: "Failed", variant: "destructive", icon: <AlertTriangle /> },
-  skipped: { label: "Skipped", variant: "muted", icon: <Check /> },
+  skipped: { label: "Skipped", variant: "muted", icon: <MinusCircle /> },
 }
 
 interface StatusBadgeProps extends Omit<BadgeProps, "variant" | "children"> {

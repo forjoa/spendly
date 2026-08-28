@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Amount } from "@/components/ui/amount"
 import { Badge } from "@/components/ui/badge"
 import { formatTransactionDate } from "@/lib/money"
+import { PageHeader } from "@/components/shell/page-header"
 import { RecurringRuleDialog } from "../_components/recurring-rule-dialog"
 import { AddTransactionDialog } from "../_components/add-transaction-dialog"
 import { RuleTable } from "../_components/rule-table"
@@ -39,19 +40,20 @@ export default async function IncomePage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Income</h1>
-          <p className="text-sm text-muted-foreground">
-            Register the money you receive — recurring income is recorded
-            automatically on each scheduled date.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <AddTransactionDialog fixedType="income" triggerLabel="Add one-time income" />
-          <RecurringRuleDialog fixedType="income" triggerLabel="Add recurring income" />
-        </div>
-      </div>
+      <PageHeader
+        title="Income"
+        description="Register the money you receive — recurring income is recorded automatically on each scheduled date."
+        actions={
+          <>
+            <AddTransactionDialog
+              fixedType="income"
+              triggerLabel="Add one-time income"
+              triggerVariant="outline"
+            />
+            <RecurringRuleDialog fixedType="income" triggerLabel="Add recurring income" />
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -98,7 +100,7 @@ export default async function IncomePage() {
                 </thead>
                 <tbody>
                   {incomeTransactions.map((tx) => (
-                    <tr key={tx.id} className="border-b last:border-0">
+                    <tr key={tx.id} className="border-b transition-colors last:border-0 hover:bg-muted/40">
                       <td className="px-6 py-3">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-medium">{tx.merchant}</span>
@@ -108,7 +110,12 @@ export default async function IncomePage() {
                         </div>
                       </td>
                       <td className="px-6 py-3 text-right">
-                        <Amount minor={tx.amountMinor} currency={tx.currency} className="font-medium" />
+                        <Amount
+                          minor={tx.amountMinor}
+                          currency={tx.currency}
+                          signed
+                          className="font-medium"
+                        />
                       </td>
                       <td className="px-6 py-3 text-muted-foreground">
                         {formatTransactionDate(tx.date.toISOString())}

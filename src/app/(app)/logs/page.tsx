@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { requireUser } from "@/infrastructure/auth/session"
 import { listApplicationLogs } from "@/domain/log/service"
+import { PageHeader } from "@/components/shell/page-header"
 import { LogExplorer, type LogExplorerItem, type LogExplorerFilters } from "./log-explorer"
 
 export const metadata: Metadata = { title: "Logs" }
@@ -63,13 +64,10 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Logs</h1>
-        <p className="text-sm text-muted-foreground">
-          Application events from your ingestion pipeline, newest first.
-          Correlate an operation with its request id.
-        </p>
-      </div>
+      <PageHeader
+        title="Logs"
+        description="Application events from your ingestion pipeline, newest first. Correlate an operation with its request id."
+      />
       <LogExplorer
         items={items}
         filters={filters}

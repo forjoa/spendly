@@ -5,6 +5,7 @@ import * as apiKeyService from "@/domain/api-key/service"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/shell/page-header"
 import { CreateApiKeyDialog } from "./create-key-dialog"
 import { RevokeKeyButton } from "./revoke-key-button"
 
@@ -25,20 +26,24 @@ export default async function ApiKeysPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">API keys</h1>
-          <CreateApiKeyDialog />
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Generate keys that your Apple Wallet shortcut uses to post transactions
-          to Spendly. The raw value is shown only once at creation. See the{" "}
-          <a href="/docs/apple-wallet-shortcut" className="underline underline-offset-2 hover:text-foreground">
-            Apple Wallet Shortcut setup guide
-          </a>
-          .
-        </p>
-      </div>
+      <PageHeader
+        title="API keys"
+        description={
+          <>
+            Generate keys that your Apple Wallet shortcut uses to post
+            transactions to Spendly. The raw value is shown only once at
+            creation. See the{" "}
+            <a
+              href="/docs/apple-wallet-shortcut"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Apple Wallet Shortcut setup guide
+            </a>
+            .
+          </>
+        }
+        actions={keys.length > 0 ? <CreateApiKeyDialog /> : undefined}
+      />
 
       {keys.length === 0 ? (
         <EmptyState
@@ -70,7 +75,7 @@ export default async function ApiKeysPage() {
                   {keys.map((key) => {
                     const revoked = key.revokedAt !== null
                     return (
-                      <tr key={key.id} className="border-b last:border-0">
+                      <tr key={key.id} className="border-b transition-colors last:border-0 hover:bg-muted/40">
                         <td className="px-6 py-3 font-medium">{key.label}</td>
                         <td className="px-6 py-3 font-mono text-xs text-muted-foreground">
                           …{key.keySuffix}

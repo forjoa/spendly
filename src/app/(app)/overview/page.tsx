@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Amount } from "@/components/ui/amount"
 import { Button } from "@/components/ui/button"
 import { formatTransactionDate, formatMinorUnits } from "@/lib/money"
+import { PageHeader } from "@/components/shell/page-header"
 import { AddTransactionDialog } from "../_components/add-transaction-dialog"
 
 export const metadata: Metadata = { title: "Overview" }
@@ -168,14 +169,10 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   if (hasNothing) {
     return (
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome, {user.name.split(" ")[0]}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your financial overview will appear here as soon as there is data.
-          </p>
-        </div>
+        <PageHeader
+          title={`Welcome, ${user.name.split(" ")[0]}`}
+          description="Your financial overview will appear here as soon as there is data."
+        />
         <Card>
           <CardHeader>
             <CardTitle>Get started</CardTitle>
@@ -197,20 +194,16 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome, {user.name.split(" ")[0]}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            How much came in, how much went out, and what is left.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <AddTransactionDialog fixedType="expense" triggerLabel="Add expense" />
-          <AddTransactionDialog fixedType="income" triggerLabel="Add income" />
-        </div>
-      </div>
+      <PageHeader
+        title={`Welcome, ${user.name.split(" ")[0]}`}
+        description="How much came in, how much went out, and what is left."
+        actions={
+          <>
+            <AddTransactionDialog fixedType="expense" triggerLabel="Add expense" />
+            <AddTransactionDialog fixedType="income" triggerLabel="Add income" />
+          </>
+        }
+      />
 
       <div className="flex items-center gap-3">
         <Button asChild variant="outline" size="icon" aria-label="Previous month">
@@ -322,7 +315,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
                 </thead>
                 <tbody>
                   {recent.map(({ transaction }) => (
-                    <tr key={transaction.id} className="border-b last:border-0">
+                    <tr key={transaction.id} className="border-b transition-colors last:border-0 hover:bg-muted/40">
                       <td className="px-6 py-3 font-medium">{transaction.merchant}</td>
                       <td className="px-6 py-3 text-right">
                         <Amount

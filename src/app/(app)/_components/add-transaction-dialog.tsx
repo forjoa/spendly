@@ -26,12 +26,20 @@ function todayKey(): string {
 interface AddTransactionDialogProps {
   fixedType: "income" | "expense"
   triggerLabel: string
+  /**
+   * Visual emphasis of the trigger button. Defaults to primary for income
+   * and outline for expense, but callers placing this alongside another
+   * action should set it explicitly so only one primary CTA appears per
+   * group (e.g. the sole action on a page should be primary).
+   */
+  triggerVariant?: "default" | "outline" | "ghost"
 }
 
 /** One-off manual transaction (e.g. cash expense, freelance payment). */
 export function AddTransactionDialog({
   fixedType,
   triggerLabel,
+  triggerVariant,
 }: AddTransactionDialogProps) {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
@@ -58,7 +66,9 @@ export function AddTransactionDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={isIncome ? "default" : "outline"}>{triggerLabel}</Button>
+        <Button variant={triggerVariant ?? (isIncome ? "default" : "outline")}>
+          {triggerLabel}
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

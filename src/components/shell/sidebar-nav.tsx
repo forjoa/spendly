@@ -35,12 +35,12 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const primary = navItems.filter((i) => !i.secondary)
   const secondary = navItems.filter((i) => i.secondary)
   return (
-    <nav className="flex flex-col gap-1" aria-label="Main">
+    <nav className="flex h-full flex-col gap-1" aria-label="Main">
       {primary.map((item) => (
         <NavLink key={item.href} item={item} onNavigate={onNavigate} />
       ))}
       {secondary.length > 0 ? (
-        <div className="mt-auto pt-4">
+        <div className="mt-auto flex flex-col gap-1 border-t border-sidebar-border pt-3">
           {secondary.map((item) => (
             <NavLink key={item.href} item={item} onNavigate={onNavigate} />
           ))}

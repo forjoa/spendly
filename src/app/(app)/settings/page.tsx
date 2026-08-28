@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { requireUser } from "@/infrastructure/auth/session"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { PageHeader } from "@/components/shell/page-header"
 import { SignOutButton } from "./sign-out-button"
 
 export const metadata: Metadata = { title: "Settings" }
@@ -9,12 +10,7 @@ export default async function SettingsPage() {
   const { user } = await requireUser()
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your account and preferences.
-        </p>
-      </div>
+      <PageHeader title="Settings" description="Manage your account and preferences." />
       <Card>
         <CardHeader>
           <CardTitle>Account</CardTitle>

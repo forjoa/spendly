@@ -59,18 +59,15 @@ function MobileTopbar({
             <Menu className="size-5" />
           </Button>
         </DialogTrigger>
-        <DialogContent
-          showClose={false}
-          className="left-0 top-0 h-dvh w-72 max-w-[80vw] translate-x-0 translate-y-0 rounded-none border-r sm:max-w-[80vw]"
-        >
-          <DialogHeader className="border-b pb-4 text-left">
-            <DialogTitle asChild>
-              <div className="flex items-center justify-between">
-                <Logo />
-              </div>
+        <DialogContent variant="drawer-left" className="flex w-72 flex-col border-r">
+          <DialogHeader className="shrink-0 border-b pb-4 text-left">
+            {/* Not asChild: Logo is a component, not a DOM element, so Radix
+                cannot clone its generated id onto it for aria-labelledby. */}
+            <DialogTitle>
+              <Logo />
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-2">
+          <div className="mt-2 min-h-0 flex-1">
             <SidebarNav
               onNavigate={() => {
                 onOpenChange?.(false)

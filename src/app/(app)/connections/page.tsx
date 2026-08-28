@@ -5,6 +5,7 @@ import { listConnections } from "@/domain/connection/service"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/shell/page-header"
 import { CreateConnectionDialog } from "./create-connection-dialog"
 import { DeleteConnectionButton } from "./delete-connection-button"
 
@@ -24,15 +25,11 @@ export default async function ConnectionsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
-          <CreateConnectionDialog />
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Spendly sends each transaction to your connected Notion database.
-        </p>
-      </div>
+      <PageHeader
+        title="Connections"
+        description="Spendly sends each transaction to your connected Notion database."
+        actions={connections.length > 0 ? <CreateConnectionDialog /> : undefined}
+      />
 
       {connections.length === 0 ? (
         <EmptyState

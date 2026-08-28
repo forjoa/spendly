@@ -27,7 +27,7 @@ export function RuleTable({ rules }: { rules: RecurringRule[] }) {
         </thead>
         <tbody>
           {rules.map((rule) => (
-            <tr key={rule.id} className="border-b last:border-0">
+            <tr key={rule.id} className="border-b transition-colors last:border-0 hover:bg-muted/40">
               <td className="px-6 py-3">
                 <div className="flex flex-col gap-0.5">
                   <span className="font-medium">{rule.name}</span>

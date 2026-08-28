@@ -36,13 +36,25 @@ function DialogOverlay({
   )
 }
 
+const DIALOG_CONTENT_VARIANTS = {
+  // Centered modal, scales + fades in place. Used by every form dialog.
+  dialog:
+    "top-1/2 left-1/2 max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl duration-200 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg",
+  // Full-height panel anchored to the left edge, slides in — for the mobile
+  // nav drawer, which is not a centered form and reads wrong scaling in place.
+  "drawer-left":
+    "top-0 left-0 h-dvh max-w-[80vw] translate-x-0 translate-y-0 gap-0 rounded-none duration-300 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+} as const
+
 function DialogContent({
   className,
   children,
   showClose = true,
+  variant = "dialog",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showClose?: boolean
+  variant?: keyof typeof DIALOG_CONTENT_VARIANTS
 }) {
   return (
     <DialogPortal>
@@ -50,7 +62,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 translate-x-[-50%] translate-y-[-50%] rounded-xl border bg-popover p-6 shadow-lg duration-200 sm:max-w-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "fixed z-50 grid w-full border bg-popover p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          DIALOG_CONTENT_VARIANTS[variant],
           className,
         )}
         {...props}
