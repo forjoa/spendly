@@ -11,14 +11,19 @@ import { recordManualTransaction } from "@/domain/transaction/service"
 
 export async function createManualTransactionAction(formData: FormData) {
   const { user } = await requireUser()
-  const result = await recordManualTransaction(user.id, {
-    merchant: formData.get("merchant"),
-    amount: formData.get("amount"),
-    currency: formData.get("currency"),
-    date: formData.get("date"),
-    type: formData.get("type"),
-    category: formData.get("category") || null,
-  })
+  const idempotencyKey = formData.get("idempotencyKey")
+  const result = await recordManualTransaction(
+    user.id,
+    {
+      merchant: formData.get("merchant"),
+      amount: formData.get("amount"),
+      currency: formData.get("currency"),
+      date: formData.get("date"),
+      type: formData.get("type"),
+      category: formData.get("category") || null,
+    },
+    typeof idempotencyKey === "string" ? idempotencyKey : undefined,
+  )
   revalidatePath("/transactions")
   revalidatePath("/income")
   revalidatePath("/overview")

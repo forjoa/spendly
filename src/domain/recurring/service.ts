@@ -37,6 +37,39 @@ function specOf(rule: RecurringRule): RecurrenceSpec {
   }
 }
 
+/**
+ * True when `existing` describes the exact same schedule as the given
+ * input — same amount, currency, type, cadence and start date. Used to
+ * guard rule creation against accidental duplicates.
+ */
+function isDuplicateOf(
+  existing: RecurringRule,
+  input: {
+    name: string
+    amountMinor: number
+    currency: string
+    type: "income" | "expense"
+    category: string | null
+    frequency: RecurringRule["frequency"]
+    dayOfMonth: number | null
+    monthOfYear: number | null
+    startDate: Date
+  },
+): boolean {
+  return (
+    existing.active &&
+    existing.name === input.name &&
+    existing.amountMinor === input.amountMinor &&
+    existing.currency === input.currency &&
+    existing.type === input.type &&
+    existing.category === input.category &&
+    existing.frequency === input.frequency &&
+    existing.dayOfMonth === input.dayOfMonth &&
+    existing.monthOfYear === input.monthOfYear &&
+    existing.startDate.getTime() === input.startDate.getTime()
+  )
+}
+
 export async function createRule(
   userId: string,
   rawInput: unknown,
@@ -49,13 +82,38 @@ export async function createRule(
   }
   const input = parsed.data
   const startDate = new Date(`${input.startDate}T00:00:00.000Z`)
+  const category = input.category ?? null
+
+  // Idempotency guard. Unlike transactions, a recurring rule has no
+  // client-supplied external id to dedupe on, and a double form submission
+  // (double-click, a retried request after a slow response) here is far
+  // more costly than a duplicate transaction: every extra identical active
+  // rule materializes its own real transaction on every future occurrence,
+  // silently doubling that income/expense forever. Treat an exact-match
+  // active rule as the same submission and return it instead of a new one.
+  const existingRules = await repo.listByUser(userId)
+  const duplicate = existingRules.find((r) =>
+    isDuplicateOf(r, {
+      name: input.name,
+      amountMinor: input.amountMinor,
+      currency: input.currency,
+      type: input.type,
+      category,
+      frequency: input.frequency,
+      dayOfMonth: input.dayOfMonth,
+      monthOfYear: input.monthOfYear,
+      startDate,
+    }),
+  )
+  if (duplicate) return duplicate
+
   return repo.insert({
     userId,
     name: input.name,
     amountMinor: input.amountMinor,
     currency: input.currency,
     type: input.type,
-    category: input.category ?? null,
+    category,
     frequency: input.frequency,
     dayOfMonth: input.dayOfMonth,
     monthOfYear: input.monthOfYear,

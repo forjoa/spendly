@@ -100,13 +100,22 @@ export const MANUAL_SOURCE = "manual"
 
 /**
  * Persist a one-off transaction entered by hand (manual income or expense).
- * Reuses the ingestion pipeline — including destination delivery — with a
- * generated idempotency key, so manual entries behave exactly like synced
- * ones. Delivery failures never lose the transaction.
+ * Reuses the ingestion pipeline — including destination delivery — so
+ * manual entries behave exactly like synced ones. Delivery failures never
+ * lose the transaction.
+ *
+ * `idempotencyKey` should be supplied by the caller and stay stable across
+ * retries of the *same* form submission (see add-transaction-dialog.tsx),
+ * so a double-click or a retried request after a network hiccup lands on
+ * the same externalId and `ingest` treats it as a replay instead of
+ * creating a second transaction. Falls back to a fresh random key only
+ * when the caller has no way to supply one — that submission then has no
+ * duplicate protection, so callers should always pass one when possible.
  */
 export async function recordManualTransaction(
   userId: string,
   rawInput: unknown,
+  idempotencyKey?: string,
 ): Promise<IngestResult> {
   const parsed = manualTransactionInputSchema.safeParse(rawInput)
   if (!parsed.success) {
@@ -114,6 +123,8 @@ export async function recordManualTransaction(
       parsed.error.issues[0]?.message ?? "Invalid transaction",
     )
   }
+  const key =
+    idempotencyKey && idempotencyKey.trim() ? idempotencyKey.trim() : crypto.randomUUID()
   return ingest(
     userId,
     {
@@ -122,7 +133,7 @@ export async function recordManualTransaction(
       source: MANUAL_SOURCE,
       account: null,
       paymentMethod: null,
-      externalId: `manual:${crypto.randomUUID()}`,
+      externalId: `manual:${key}`,
     },
     { tolerateDeliveryFailure: true },
   )

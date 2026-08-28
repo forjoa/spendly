@@ -68,8 +68,17 @@ export function RecurringRuleDialog({
   const [frequency, setFrequency] = React.useState(
     rule?.frequency ?? "monthly",
   )
+  // Synchronous guard against a double-click racing ahead of the `pending`
+  // re-render. This matters much more here than on a plain transaction: a
+  // duplicate *rule* materializes its own real transaction on every future
+  // occurrence, silently doubling that income/expense forever, not just
+  // once (the domain service also rejects an exact-duplicate create as a
+  // second line of defense — see recurring/service.ts).
+  const submittingRef = React.useRef(false)
 
   function onSubmit(formData: FormData) {
+    if (submittingRef.current) return
+    submittingRef.current = true
     startTransition(async () => {
       try {
         if (rule) {
@@ -83,6 +92,8 @@ export function RecurringRuleDialog({
         setOpen(false)
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Could not save rule")
+      } finally {
+        submittingRef.current = false
       }
     })
   }

@@ -45,7 +45,25 @@ export function AddTransactionDialog({
   const [pending, startTransition] = React.useTransition()
   const isIncome = fixedType === "income"
 
+  // Idempotency key for this "add one entry" attempt. Regenerated every time
+  // the dialog opens for a new entry; a double-click or a retried submission
+  // of the *same* open form reuses it, so the server treats the repeat as a
+  // replay instead of saving the transaction twice (see
+  // recordManualTransaction in the transaction domain service).
+  const [idempotencyKey, setIdempotencyKey] = React.useState(() => crypto.randomUUID())
+  // Synchronous guard against a double-click racing ahead of the `pending`
+  // re-render — useTransition's pending flag only disables the Save button
+  // after React re-renders, which a fast double-click/double-Enter can beat.
+  const submittingRef = React.useRef(false)
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (nextOpen) setIdempotencyKey(crypto.randomUUID())
+  }
+
   function onSubmit(formData: FormData) {
+    if (submittingRef.current) return
+    submittingRef.current = true
     startTransition(async () => {
       try {
         const result = await createManualTransactionAction(formData)
@@ -59,12 +77,14 @@ export function AddTransactionDialog({
         toast.error(
           err instanceof Error ? err.message : "Could not save transaction",
         )
+      } finally {
+        submittingRef.current = false
       }
     })
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant={triggerVariant ?? (isIncome ? "default" : "outline")}>
           {triggerLabel}
@@ -81,6 +101,7 @@ export function AddTransactionDialog({
         </DialogHeader>
         <form action={onSubmit} className="flex flex-col gap-4">
           <input type="hidden" name="type" value={fixedType} />
+          <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="mt-merchant">{isIncome ? "From" : "Merchant"}</Label>
