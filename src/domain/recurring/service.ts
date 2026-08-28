@@ -196,6 +196,30 @@ export async function updateRule(
       )
     : existing.nextRunDate
 
+  // TEMPORARY diagnostic — a live report says nextRunDate is not updating
+  // to match an edited start date/schedule despite the fix above. This
+  // captures every input to that decision so the next real edit is fully
+  // attributable instead of guessed at. Remove once root-caused.
+  log.info("recurring.rule.update.debug", {
+    recurringRuleId: id,
+    rawInputStartDate:
+      typeof rawInput === "object" && rawInput !== null
+        ? (rawInput as Record<string, unknown>).startDate
+        : undefined,
+    parsedInputStartDate: input.startDate,
+    parsedInputFrequency: input.frequency,
+    parsedInputDayOfMonth: input.dayOfMonth,
+    parsedInputMonthOfYear: input.monthOfYear,
+    computedStartDate: startDate.toISOString(),
+    existingStartDate: existing.startDate.toISOString(),
+    existingFrequency: existing.frequency,
+    existingDayOfMonth: existing.dayOfMonth,
+    existingMonthOfYear: existing.monthOfYear,
+    existingNextRunDate: existing.nextRunDate.toISOString(),
+    scheduleChanged,
+    computedNextRunDate: nextRunDate.toISOString(),
+  })
+
   const updated = await repo.update(userId, id, {
     name: input.name,
     amountMinor: input.amountMinor,
